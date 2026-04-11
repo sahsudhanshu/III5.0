@@ -1,15 +1,14 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 "use client";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useSession } from "next-auth/react";
 import {
-  MOCK_PORTFOLIO, MOCK_NEWS, MOCK_TRANSACTIONS,
-  generatePortfolioHistory, MOCK_SECTOR_ALLOCATION,
+  MOCK_NEWS,
 } from "@/lib/mock-data";
 import { formatCurrency, formatPercent, cn, timeAgo } from "@/lib/utils";
 import {
   TrendingUp, TrendingDown, ArrowUpRight, ArrowDownRight,
-  ChevronRight, Wallet, BarChart2, Clock,
+  ChevronRight, Clock,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -19,8 +18,7 @@ import {
   ResponsiveContainer, PieChart, Pie, Cell,
 } from "recharts";
 import { useDataStore, INITIAL_UNIVERSE } from "@/store/data-store";
-
-const HISTORY = generatePortfolioHistory(90);
+import { usePortfolioStore } from "@/store/portfolio-store";
 
 export default function DashboardPage() {
   const { data: session } = useSession();
@@ -28,8 +26,13 @@ export default function DashboardPage() {
   const router = useRouter();
   
   const { stocks, fetchStockProfile } = useDataStore();
+  const { portfolio, fetchPortfolio } = usePortfolioStore();
   const [loading, setLoading] = useState(true);
   const [timeRange, setTimeRange] = useState("1M");
+
+  useEffect(() => {
+    fetchPortfolio();
+  }, [fetchPortfolio]);
 
   useEffect(() => {
     async function loadUniverse() {
@@ -48,16 +51,89 @@ export default function DashboardPage() {
     }
   }, [fetchStockProfile, stocks]);
 
-  const p = MOCK_PORTFOLIO;
+  const holdings = useMemo(() => {
+    const source = portfolio?.holdings ?? [];
+    return source.map((h) => {
+      const livePrice = stocks[h.symbol]?.price ?? h.avgBuyPrice;
+      const prevClose = stocks[h.symbol]?.previousClose ?? livePrice;
+      const investedValue = h.avgBuyPrice * h.qty;
+      const currentValue = livePrice * h.qty;
+      const pnl = currentValue - investedValue;
+      const pnlPercent = investedValue > 0 ? (pnl / investedValue) * 100 : 0;
+      const dayChange = (livePrice - prevClose) * h.qty;
+      const dayChangePercent = prevClose > 0 ? ((livePrice - prevClose) / prevClose) * 100 : 0;
+
+      return {
+        ...h,
+        livePrice,
+        investedValue,
+        currentValue,
+        pnl,
+        pnlPercent,
+        dayChange,
+        dayChangePercent,
+      };
+    });
+  }, [portfolio?.holdings, stocks]);
+
+  const cash = portfolio?.cashBalance ?? 0;
+  const totalInvested = holdings.reduce((sum, h) => sum + h.investedValue, 0);
+  const totalCurrent = holdings.reduce((sum, h) => sum + h.currentValue, 0);
+  const totalValue = cash + totalCurrent;
+  const totalPnL = totalCurrent - totalInvested;
+  const totalPnLPercent = totalInvested > 0 ? (totalPnL / totalInvested) * 100 : 0;
+  const dayPnL = holdings.reduce((sum, h) => sum + h.dayChange, 0);
+  const dayBase = totalCurrent - dayPnL;
+  const dayPnLPercent = dayBase > 0 ? (dayPnL / dayBase) * 100 : 0;
+
+  const history = useMemo(() => {
+    const baseValue = totalValue > 0 ? totalValue : 10000;
+    return Array.from({ length: 90 }, (_, i) => {
+      const d = new Date();
+      d.setDate(d.getDate() - (89 - i));
+      return { date: d.toISOString(), value: baseValue };
+    });
+  }, [totalValue]);
+
+  const transactions = useMemo(() => {
+    return [...(portfolio?.transactions ?? [])]
+      .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+  }, [portfolio?.transactions]);
+
+  const recentOrders = transactions
+    .filter((t) => t.type === "BUY" || t.type === "SELL")
+    .slice(0, 4);
+
+  const sectorAllocation = useMemo(() => {
+    const palette = ["#00D09C", "#4F46E5", "#F59E0B", "#EF4444", "#0EA5E9", "#22C55E", "#A855F7"];
+    const grouped: Record<string, number> = {};
+
+    for (const h of holdings) {
+      const key = h.sector || "Other";
+      grouped[key] = (grouped[key] ?? 0) + h.currentValue;
+    }
+
+    const total = holdings.reduce((sum, h) => sum + h.currentValue, 0);
+    return Object.entries(grouped)
+      .map(([sector, value], idx) => ({
+        sector,
+        value,
+        percentage: total > 0 ? (value / total) * 100 : 0,
+        color: palette[idx % palette.length],
+      }))
+      .sort((a, b) => b.value - a.value)
+      .slice(0, 6);
+  }, [holdings]);
+
   const availableStocks = INITIAL_UNIVERSE.map(s => stocks[s]).filter(Boolean);
   const gainers = availableStocks.filter((s) => s.changePercent > 0).sort((a, b) => b.changePercent - a.changePercent).slice(0, 4);
   const losers  = availableStocks.filter((s) => s.changePercent < 0).sort((a, b) => a.changePercent - b.changePercent).slice(0, 4);
 
   const chartData = {
-    "1W": HISTORY.slice(-7),
-    "1M": HISTORY.slice(-30),
-    "3M": HISTORY.slice(-90),
-  }[timeRange] ?? HISTORY.slice(-30);
+    "1W": history.slice(-7),
+    "1M": history.slice(-30),
+    "3M": history.slice(-90),
+  }[timeRange] ?? history.slice(-30);
 
   const hour = new Date().getHours();
   const greeting = hour < 12 ? "Good morning" : hour < 17 ? "Good afternoon" : "Good evening";
@@ -87,32 +163,32 @@ export default function DashboardPage() {
               {loading ? (
                 <div className="h-10 w-48 bg-muted rounded-lg animate-pulse" />
               ) : (
-                <p className="text-4xl font-black num text-foreground">{formatCurrency(p.totalValue + p.cash)}</p>
+                <p className="text-4xl font-black num text-foreground">{formatCurrency(totalValue)}</p>
               )}
             </div>
 
             <div className="flex flex-wrap gap-4">
               <div>
                 <p className="text-[11px] text-muted-foreground">Total P&L</p>
-                <div className={cn("flex items-center gap-1 font-bold num text-sm", p.totalPnL >= 0 ? "text-bull" : "text-bear")}>
-                  {p.totalPnL >= 0 ? <TrendingUp className="w-3.5 h-3.5" /> : <TrendingDown className="w-3.5 h-3.5" />}
-                  {formatCurrency(p.totalPnL)} ({formatPercent(p.totalPnLPercent)})
+                <div className={cn("flex items-center gap-1 font-bold num text-sm", totalPnL >= 0 ? "text-bull" : "text-bear")}>
+                  {totalPnL >= 0 ? <TrendingUp className="w-3.5 h-3.5" /> : <TrendingDown className="w-3.5 h-3.5" />}
+                  {formatCurrency(totalPnL)} ({formatPercent(totalPnLPercent)})
                 </div>
               </div>
               <div>
                 <p className="text-[11px] text-muted-foreground">Today&apos;s P&L</p>
-                <div className={cn("flex items-center gap-1 font-bold num text-sm", p.dayPnL >= 0 ? "text-bull" : "text-bear")}>
-                  {p.dayPnL >= 0 ? <ArrowUpRight className="w-3.5 h-3.5" /> : <ArrowDownRight className="w-3.5 h-3.5" />}
-                  {formatCurrency(p.dayPnL)} ({formatPercent(p.dayPnLPercent)})
+                <div className={cn("flex items-center gap-1 font-bold num text-sm", dayPnL >= 0 ? "text-bull" : "text-bear")}>
+                  {dayPnL >= 0 ? <ArrowUpRight className="w-3.5 h-3.5" /> : <ArrowDownRight className="w-3.5 h-3.5" />}
+                  {formatCurrency(dayPnL)} ({formatPercent(dayPnLPercent)})
                 </div>
               </div>
               <div>
                 <p className="text-[11px] text-muted-foreground">Invested</p>
-                <p className="text-sm font-bold num">{formatCurrency(p.totalInvested)}</p>
+                <p className="text-sm font-bold num">{formatCurrency(totalInvested)}</p>
               </div>
               <div>
                 <p className="text-[11px] text-muted-foreground">Cash</p>
-                <p className="text-sm font-bold num">{formatCurrency(p.cash)}</p>
+                <p className="text-sm font-bold num">{formatCurrency(cash)}</p>
               </div>
             </div>
 
@@ -172,7 +248,7 @@ export default function DashboardPage() {
             </button>
           </div>
           <div className="space-y-0.5">
-            {p.holdings.slice(0, 5).map((h) => (
+            {holdings.slice(0, 5).map((h) => (
               <div
                 key={h.symbol}
                 className="flex items-center gap-2.5 py-2 px-2 rounded-lg hover:bg-muted/50 cursor-pointer transition-colors"
@@ -183,7 +259,7 @@ export default function DashboardPage() {
                 </div>
                 <div className="flex-1 min-w-0">
                   <p className="text-xs font-bold truncate">{h.symbol}</p>
-                  <p className="text-[10px] text-muted-foreground">{h.quantity} shares</p>
+                  <p className="text-[10px] text-muted-foreground">{h.qty} shares</p>
                 </div>
                 <div className="text-right">
                   <p className="text-xs font-bold num">{formatCurrency(h.currentValue)}</p>
@@ -193,6 +269,9 @@ export default function DashboardPage() {
                 </div>
               </div>
             ))}
+            {holdings.length === 0 && (
+              <p className="text-xs text-muted-foreground py-2">No holdings yet. Start by buying your first stock.</p>
+            )}
           </div>
         </div>
 
@@ -240,24 +319,28 @@ export default function DashboardPage() {
         {/* Sector allocation */}
         <div className="groww-card p-4">
           <p className="text-sm font-bold mb-3">Sector Split</p>
+          {sectorAllocation.length > 0 ? (
           <div className="flex items-center gap-4">
             <PieChart width={100} height={100}>
-              <Pie data={MOCK_SECTOR_ALLOCATION} cx={47} cy={47} innerRadius={28} outerRadius={48} dataKey="percentage" strokeWidth={1}>
-                {MOCK_SECTOR_ALLOCATION.map((e, i) => <Cell key={i} fill={e.color} />)}
+              <Pie data={sectorAllocation} cx={47} cy={47} innerRadius={28} outerRadius={48} dataKey="percentage" strokeWidth={1}>
+                {sectorAllocation.map((e, i) => <Cell key={i} fill={e.color} />)}
               </Pie>
             </PieChart>
             <div className="flex-1 space-y-1.5">
-              {MOCK_SECTOR_ALLOCATION.map((s) => (
+              {sectorAllocation.map((s) => (
                 <div key={s.sector} className="flex items-center justify-between">
                   <div className="flex items-center gap-1.5">
                     <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: s.color }} />
                     <span className="text-[11px] text-muted-foreground">{s.sector}</span>
                   </div>
-                  <span className="text-[11px] font-semibold num">{s.percentage}%</span>
+                  <span className="text-[11px] font-semibold num">{s.percentage.toFixed(1)}%</span>
                 </div>
               ))}
             </div>
           </div>
+          ) : (
+            <p className="text-xs text-muted-foreground">No sector data yet. Holdings will appear after your first buy order.</p>
+          )}
         </div>
       </div>
 
@@ -272,7 +355,7 @@ export default function DashboardPage() {
             </button>
           </div>
           <div className="space-y-2">
-            {MOCK_TRANSACTIONS.slice(0, 4).map((t) => (
+            {recentOrders.map((t) => (
               <div key={t.id} className="flex items-center gap-3 py-2 px-2 rounded-lg hover:bg-muted/50 transition-colors">
                 <div className={cn("w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0", t.type === "BUY" ? "bg-bull-muted" : "bg-bear-muted")}>
                   {t.type === "BUY"
@@ -281,14 +364,14 @@ export default function DashboardPage() {
                 </div>
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-1.5">
-                    <p className="text-xs font-bold">{t.symbol}</p>
+                    <p className="text-xs font-bold">{t.symbol ?? "Unknown"}</p>
                     <Badge variant="secondary" className={cn("text-[9px] px-1", t.type === "BUY" ? "bg-bull-muted text-bull" : "bg-bear-muted text-bear")}>{t.type}</Badge>
                   </div>
-                  <p className="text-[10px] text-muted-foreground">{t.quantity} × {formatCurrency(t.price)}</p>
+                  <p className="text-[10px] text-muted-foreground">{t.qty ?? 0} × {formatCurrency(t.price ?? 0)}</p>
                 </div>
                 <div className="text-right flex-shrink-0">
                   <p className={cn("text-xs font-bold num", t.type === "BUY" ? "text-bear" : "text-bull")}>
-                    {t.type === "BUY" ? "-" : "+"}{formatCurrency(t.totalValue)}
+                    {t.amount < 0 ? "-" : "+"}{formatCurrency(Math.abs(t.amount))}
                   </p>
                   <div className="flex items-center gap-0.5 justify-end mt-0.5">
                     <Clock className="w-2.5 h-2.5 text-muted-foreground" />
@@ -297,6 +380,9 @@ export default function DashboardPage() {
                 </div>
               </div>
             ))}
+            {recentOrders.length === 0 && (
+              <p className="text-xs text-muted-foreground py-2">No orders yet. Your latest buy/sell activity will appear here.</p>
+            )}
           </div>
         </div>
 

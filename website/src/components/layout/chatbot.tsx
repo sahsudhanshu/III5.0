@@ -39,9 +39,9 @@ function formatInline(text: string): string {
 }
 
 const QUICK_PROMPTS = [
-  "What's my portfolio status?",
-  "Top stocks to buy today",
-  "Nifty market update",
+  "Analyze AAPL stock today",
+  "S&P 500 market outlook",
+  "Best tech stocks to buy?",
   "Explain P/E ratio",
 ];
 

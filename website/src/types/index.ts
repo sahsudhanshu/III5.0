@@ -81,21 +81,21 @@ export interface Portfolio {
 }
 
 // ---- Transactions ----
-export type TransactionType = "BUY" | "SELL";
+export type TransactionType = "BUY" | "SELL" | "DEPOSIT" | "WITHDRAW";
 export type TransactionStatus = "COMPLETED" | "PENDING" | "CANCELLED" | "FAILED";
 
 export interface Transaction {
   id: string;
-  symbol: string;
-  name: string;
+  symbol?: string;
+  name?: string;
   type: TransactionType;
-  quantity: number;
-  price: number;
-  totalValue: number;
+  quantity?: number;
+  price?: number;
+  totalValue?: number;
   status: TransactionStatus;
   timestamp: string;
-  charges: number;
-  taxes: number;
+  charges?: number;
+  taxes?: number;
 }
 
 // ---- Order ----

@@ -12,6 +12,7 @@ import { useWatchlistStore } from "@/store/watchlist-store";
 import { useChatStore } from "@/store/chat-store";
 import { useMarketStore } from "@/store/market-store";
 import { useDataStore, INITIAL_UNIVERSE } from "@/store/data-store";
+import { usePortfolioStore } from "@/store/portfolio-store";
 import { ChartSkeleton } from "@/components/common/skeletons";
 import { toast } from "sonner";
 import {
@@ -41,6 +42,7 @@ export default function StockDetailPage() {
   const { prices, subscribe, unsubscribe } = useMarketStore();
   
   const { stocks, news, candles, fetchStockProfile, fetchNews, fetchCandles } = useDataStore();
+  const { portfolio, fetchPortfolio, placeOrder } = usePortfolioStore();
 
   const [loading, setLoading] = useState(true);
   const [timeFilter, setTimeFilter] = useState<TimeFilter>("1M");
@@ -107,6 +109,10 @@ export default function StockDetailPage() {
     };
   }, [targetSymbol, setContext, subscribe, unsubscribe]);
 
+  useEffect(() => {
+    fetchPortfolio();
+  }, [fetchPortfolio]);
+
   // Derived values
   const isPositive = (stock?.changePercent ?? 0) >= 0;
   const inWatchlist = stock ? isInWatchlist(stock.symbol) : false;
@@ -124,12 +130,38 @@ export default function StockDetailPage() {
 
   const handleOrder = async () => {
     if (!stock || parseInt(qty) <= 0) { toast.error("Enter a valid quantity"); return; }
+    const qtyNum = parseInt(qty);
+    const total = qtyNum * stock.price;
+
+    if (orderType === "BUY" && (portfolio?.cashBalance ?? 0) < total) {
+      toast.error(`Insufficient funds. Need ${formatCurrency(total)}, have ${formatCurrency(portfolio?.cashBalance ?? 0)}`);
+      return;
+    }
+    if (orderType === "SELL") {
+      const holding = portfolio?.holdings?.find(h => h.symbol === stock.symbol);
+      if (!holding || holding.qty < qtyNum) {
+        toast.error(`Insufficient shares. You own ${holding?.qty ?? 0} shares.`);
+        return;
+      }
+    }
+
     setOrderLoading(true);
-    await new Promise((r) => setTimeout(r, 1200));
-    setOrderLoading(false);
-    toast.success(`✅ ${orderType} ${qty} shares of ${stock.symbol}`, {
-      description: `@ ${formatCurrency(stock.price)} · Total: ${formatCurrency(parseInt(qty) * stock.price)}`,
+    const ok = await placeOrder({
+      type: orderType,
+      symbol: stock.symbol,
+      name: stock.name,
+      exchange: stock.exchange,
+      sector: stock.sector,
+      qty: qtyNum,
+      price: stock.price,
     });
+    setOrderLoading(false);
+
+    if (ok) {
+      toast.success(`✅ ${orderType} ${qty} shares of ${stock.symbol}`, {
+        description: `@ ${formatCurrency(stock.price)} · Total: ${formatCurrency(total)}`,
+      });
+    }
   };
 
   if (!loading && !stock) {
@@ -373,6 +405,25 @@ export default function StockDetailPage() {
                     <Input type="number" min="1" value={qty} onChange={(e) => setQty(e.target.value)} className="mt-1.5 h-10" />
                   </div>
 
+                  {/* Balance / Shares info */}
+                  {portfolio && (
+                    <div className="flex items-center justify-between py-2 px-3 bg-muted/30 rounded-lg border border-border/50">
+                      {orderType === "BUY" ? (
+                        <>
+                          <span className="text-[10px] text-muted-foreground">Available Cash</span>
+                          <span className="text-xs font-bold num text-bull">{formatCurrency(portfolio.cashBalance)}</span>
+                        </>
+                      ) : (
+                        <>
+                          <span className="text-[10px] text-muted-foreground">Shares Owned</span>
+                          <span className="text-xs font-bold num">
+                            {portfolio.holdings?.find(h => h.symbol === stock.symbol)?.qty ?? 0} shares
+                          </span>
+                        </>
+                      )}
+                    </div>
+                  )}
+
                   <div className="flex items-center justify-between py-2.5 px-3 bg-muted/50 rounded-lg">
                     <span className="text-xs text-muted-foreground">Order Value</span>
                     <span className="text-sm font-bold num">{formatCurrency(parseInt(qty || "0") * stock.price)}</span>
@@ -391,7 +442,7 @@ export default function StockDetailPage() {
                       : `${orderType} ${stock.symbol}`
                     }
                   </button>
-                  <p className="text-[10px] text-muted-foreground text-center">Simulated — no real money involved</p>
+                  <p className="text-[10px] text-muted-foreground text-center">Paper trading — no real money involved</p>
                 </div>
               </div>
 

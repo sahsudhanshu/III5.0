@@ -18,10 +18,7 @@ import {
   TrendingUp, TrendingDown, Star, Bot, ArrowLeft,
   CandlestickChart, LineChart,
 } from "lucide-react";
-import {
-  AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip,
-  ResponsiveContainer, BarChart, Bar, ComposedChart, Line,
-} from "recharts";
+import { TradingChart } from "@/components/common/trading-chart";
 import type { TimeFilter, ChartType } from "@/types";
 
 const TIME_FILTERS: TimeFilter[] = ["1W", "1M", "3M", "1Y"];
@@ -113,8 +110,6 @@ export default function StockDetailPage() {
   // Derived values
   const isPositive = (stock?.changePercent ?? 0) >= 0;
   const inWatchlist = stock ? isInWatchlist(stock.symbol) : false;
-  const lineData = chartData.map((d) => ({ time: d.time, value: d.close, volume: d.volume }));
-  const strokeColor = isPositive ? "#00d09c" : "#eb5b3c";
 
   const toggleWatchlist = () => {
     if (!stock) return;
@@ -261,49 +256,15 @@ export default function StockDetailPage() {
               </div>
             </div>
 
-            {loading && chartData.length === 0 ? <ChartSkeleton height={260} /> : (
-              chartType === "area" ? (
-                <ResponsiveContainer width="100%" height={260}>
-                  <AreaChart data={lineData}>
-                    <defs>
-                      <linearGradient id="sg" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="5%" stopColor={strokeColor} stopOpacity={0.15} />
-                        <stop offset="95%" stopColor={strokeColor} stopOpacity={0} />
-                      </linearGradient>
-                    </defs>
-                    <CartesianGrid strokeDasharray="3 3" className="opacity-10" vertical={false} />
-                    <XAxis dataKey="time" tick={{ fontSize: 10 }} axisLine={false} tickLine={false}
-                      tickFormatter={(v) => { const d = new Date(v); return `${d.getDate()}/${d.getMonth()+1}`; }}
-                      interval="preserveStartEnd" />
-                    <YAxis domain={["auto","auto"]} tickFormatter={(v) => `$${v.toFixed(0)}`} tick={{ fontSize: 10 }} axisLine={false} tickLine={false} width={60} />
-                    <Tooltip formatter={(v: any) => [formatCurrency(v), "Price"]} contentStyle={{ background: "var(--card)", border: "1px solid var(--border)", borderRadius: "10px", fontSize: "12px" }} />
-                    <Area type="monotone" dataKey="value" stroke={strokeColor} strokeWidth={2} fill="url(#sg)" dot={false} />
-                  </AreaChart>
-                </ResponsiveContainer>
-              ) : (
-                <ResponsiveContainer width="100%" height={260}>
-                  <ComposedChart data={chartData}>
-                    <CartesianGrid strokeDasharray="3 3" className="opacity-10" vertical={false} />
-                    <XAxis dataKey="time" tick={{ fontSize: 10 }} axisLine={false} tickLine={false} tickFormatter={(v) => { const d = new Date(v); return `${d.getDate()}/${d.getMonth()+1}`; }} interval="preserveStartEnd" />
-                    <YAxis domain={["auto","auto"]} tickFormatter={(v) => `$${v.toFixed(0)}`} tick={{ fontSize: 10 }} axisLine={false} tickLine={false} width={60} />
-                    <Tooltip formatter={(v: any, n: any) => [formatCurrency(v), n]} contentStyle={{ background: "var(--card)", border: "1px solid var(--border)", borderRadius: "10px", fontSize: "11px" }} />
-                    <Bar dataKey="low" fill="transparent" />
-                    <Bar dataKey="high" fill={`${strokeColor}55`} stackId="c" />
-                    <Line type="linear" dataKey="close" stroke={strokeColor} strokeWidth={1.5} dot={false} />
-                  </ComposedChart>
-                </ResponsiveContainer>
-              )
+            {loading && chartData.length === 0 ? (
+              <ChartSkeleton height={320} />
+            ) : (
+              <TradingChart 
+                data={chartData} 
+                type={chartType === "candlestick" ? "candlestick" : "area"} 
+                height={320} 
+              />
             )}
-
-            {/* Volume bar */}
-            <div className="mt-3 border-t border-border pt-3">
-              <p className="text-[10px] text-muted-foreground mb-1.5">Volume</p>
-              <ResponsiveContainer width="100%" height={40}>
-                <BarChart data={lineData}>
-                  <Bar dataKey="volume" fill={`${strokeColor}50`} radius={[2,2,0,0]} />
-                </BarChart>
-              </ResponsiveContainer>
-            </div>
           </div>
 
           {/* Tabs */}

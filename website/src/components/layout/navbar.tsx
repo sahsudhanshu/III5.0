@@ -25,12 +25,12 @@ import {
 
 // ── Primary nav items (Groww style) ──
 const NAV_ITEMS = [
-  { href: "/dashboard",     label: "Dashboard"    },
-  { href: "/explore",       label: "Explore"      },
-  { href: "/portfolio",     label: "Portfolio"    },
-  { href: "/transactions",  label: "Transactions" },
-  { href: "/news",          label: "News"         },
-  { href: "/watchlist",     label: "Watchlist"    },
+  { href: "/dashboard", label: "Dashboard" },
+  { href: "/explore", label: "Explore" },
+  { href: "/portfolio", label: "Portfolio" },
+  { href: "/transactions", label: "Transactions" },
+  { href: "/news", label: "News" },
+  { href: "/watchlist", label: "Watchlist" },
 ];
 
 // ── Company brand ──
@@ -159,14 +159,14 @@ function MarketTicker() {
     // Subscribe to ticker stocks for live updates
     const symbols = INITIAL_UNIVERSE.map(s => s === "BTC" ? "BINANCE:BTCUSDT" : s).slice(0, 5);
     symbols.forEach(s => subscribe(s));
-    
+
     return () => {
       symbols.forEach(s => unsubscribe(s));
     };
   }, [subscribe, unsubscribe]);
 
   const { stocks } = useDataStore();
-  
+
   // Merge static with live prices
   const displayStocks = INITIAL_UNIVERSE.slice(0, 5).map(symbol => {
     const s = stocks[symbol];
@@ -188,9 +188,9 @@ function MarketTicker() {
         {[...displayStocks, ...displayStocks].filter(Boolean).map((s, i) => (
           <span key={i} className="flex items-center gap-1.5 whitespace-nowrap">
             <span className="text-[11px] font-semibold text-muted-foreground">{s!.symbol}</span>
-            <span className={cn("text-[11px] font-bold num transition-colors duration-300", 
-              s!.live && s!.isUp ? "text-bull" : s!.live && !s!.isUp ? "text-bear" : 
-              s!.changePercent >= 0 ? "text-bull" : "text-bear"
+            <span className={cn("text-[11px] font-bold num transition-colors duration-300",
+              s!.live && s!.isUp ? "text-bull" : s!.live && !s!.isUp ? "text-bear" :
+                s!.changePercent >= 0 ? "text-bull" : "text-bear"
             )}>
               {s!.live ? formatCurrency(s!.currentPrice) : (s!.changePercent >= 0 ? "+" : "") + formatPercent(s!.changePercent)}
             </span>

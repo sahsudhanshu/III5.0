@@ -4,5 +4,5 @@ langchain-openai>=0.2.0
 python-dotenv>=1.0.1
 requests>=2.32.0
 yfinance>=0.2.32
-znews>=0.1.0
+gnews
 pandas>=1.5.0

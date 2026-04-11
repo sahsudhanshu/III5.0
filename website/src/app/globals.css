@@ -1,0 +1,293 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap');
+@import "tailwindcss";
+@import "tw-animate-css";
+@import "shadcn/tailwind.css";
+
+@custom-variant dark (&:is(.dark *));
+
+/* ============================================================
+   GROWW-INSPIRED DESIGN SYSTEM
+   Primary: #00d09c | Danger: #eb5b3c
+   ============================================================ */
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --font-sans: 'Inter', system-ui, -apple-system, sans-serif;
+  --font-mono: 'JetBrains Mono', monospace;
+
+  --color-sidebar-ring: var(--sidebar-ring);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar: var(--sidebar);
+
+  --color-chart-5: var(--chart-5);
+  --color-chart-4: var(--chart-4);
+  --color-chart-3: var(--chart-3);
+  --color-chart-2: var(--chart-2);
+  --color-chart-1: var(--chart-1);
+
+  --color-ring: var(--ring);
+  --color-input: var(--input);
+  --color-border: var(--border);
+  --color-destructive: var(--destructive);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-accent: var(--accent);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-muted: var(--muted);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-secondary: var(--secondary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-primary: var(--primary);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-popover: var(--popover);
+  --color-card-foreground: var(--card-foreground);
+  --color-card: var(--card);
+
+  --radius-sm: calc(var(--radius) * 0.6);
+  --radius-md: calc(var(--radius) * 0.8);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) * 1.4);
+
+  /* Trading tokens */
+  --color-bull: var(--bull);
+  --color-bear: var(--bear);
+  --color-bull-muted: var(--bull-muted);
+  --color-bear-muted: var(--bear-muted);
+}
+
+/* ============================================================
+   LIGHT THEME — Groww White
+   ============================================================ */
+:root {
+  --background: #f4f7f9;
+  --foreground: #44475b;
+
+  --card: #ffffff;
+  --card-foreground: #44475b;
+
+  --popover: #ffffff;
+  --popover-foreground: #44475b;
+
+  /* Groww Green */
+  --primary: #00d09c;
+  --primary-foreground: #ffffff;
+
+  --secondary: #f0f3f7;
+  --secondary-foreground: #44475b;
+
+  --muted: #f0f3f7;
+  --muted-foreground: #7c7e8c;
+
+  --accent: #e8faf5;
+  --accent-foreground: #00d09c;
+
+  /* Groww Red */
+  --destructive: #eb5b3c;
+
+  --border: #e0e3eb;
+  --input: #f0f3f7;
+  --ring: #00d09c;
+
+  /* Chart palette */
+  --chart-1: #00d09c;
+  --chart-2: #5367ff;
+  --chart-3: #ff9800;
+  --chart-4: #9c27b0;
+  --chart-5: #eb5b3c;
+
+  --radius: 0.625rem;
+
+  /* Sidebar (unused but kept for shadcn compat) */
+  --sidebar: #ffffff;
+  --sidebar-foreground: #44475b;
+  --sidebar-primary: #00d09c;
+  --sidebar-primary-foreground: #ffffff;
+  --sidebar-accent: #f0f3f7;
+  --sidebar-accent-foreground: #44475b;
+  --sidebar-border: #e0e3eb;
+  --sidebar-ring: #00d09c;
+
+  /* Trading */
+  --bull: #00d09c;
+  --bear: #eb5b3c;
+  --bull-muted: #e8faf5;
+  --bear-muted: #fdf0ed;
+}
+
+/* ============================================================
+   DARK THEME — Groww Dark
+   ============================================================ */
+.dark {
+  --background: #1a1a2e;
+  --foreground: #e8eaf0;
+
+  --card: #222236;
+  --card-foreground: #e8eaf0;
+
+  --popover: #222236;
+  --popover-foreground: #e8eaf0;
+
+  /* Groww Green stays */
+  --primary: #00d09c;
+  --primary-foreground: #0f1923;
+
+  --secondary: #2a2a42;
+  --secondary-foreground: #c8cad8;
+
+  --muted: #2a2a42;
+  --muted-foreground: #7c7e97;
+
+  --accent: #1a3a32;
+  --accent-foreground: #00d09c;
+
+  --destructive: #eb5b3c;
+
+  --border: rgba(255,255,255,0.08);
+  --input: rgba(255,255,255,0.06);
+  --ring: #00d09c;
+
+  --chart-1: #00d09c;
+  --chart-2: #7b87ff;
+  --chart-3: #ffb347;
+  --chart-4: #ce93d8;
+  --chart-5: #ff7a5c;
+
+  --sidebar: #1a1a2e;
+  --sidebar-foreground: #e8eaf0;
+  --sidebar-primary: #00d09c;
+  --sidebar-primary-foreground: #0f1923;
+  --sidebar-accent: #2a2a42;
+  --sidebar-accent-foreground: #e8eaf0;
+  --sidebar-border: rgba(255,255,255,0.06);
+  --sidebar-ring: #00d09c;
+
+  --bull: #00d09c;
+  --bear: #eb5b3c;
+  --bull-muted: #0d2a22;
+  --bear-muted: #2d1610;
+}
+
+/* ============================================================
+   BASE
+   ============================================================ */
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  html {
+    @apply font-sans;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    font-feature-settings: "cv02","cv03","cv04","cv11";
+  }
+  body {
+    @apply bg-background text-foreground;
+    text-rendering: optimizeLegibility;
+  }
+
+  ::-webkit-scrollbar { width: 5px; height: 5px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 100px; }
+  ::selection { background: rgba(0,208,156,0.18); }
+}
+
+/* ============================================================
+   UTILITIES
+   ============================================================ */
+@layer utilities {
+  .text-bull { color: var(--bull); }
+  .text-bear { color: var(--bear); }
+  .bg-bull { background-color: var(--bull); }
+  .bg-bear { background-color: var(--bear); }
+  .bg-bull-muted { background-color: var(--bull-muted); }
+  .bg-bear-muted { background-color: var(--bear-muted); }
+
+  /* Groww card */
+  .groww-card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+  }
+
+  /* Number display */
+  .num {
+    font-family: var(--font-mono);
+    font-variant-numeric: tabular-nums;
+    letter-spacing: -0.02em;
+  }
+
+  /* Gradient text */
+  .gradient-text {
+    background: linear-gradient(135deg, #00d09c, #00b8a9);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+
+  /* Active nav underline */
+  .nav-active::after {
+    content: '';
+    position: absolute;
+    bottom: -1px;
+    left: 0;
+    right: 0;
+    height: 2px;
+    background: #00d09c;
+    border-radius: 8px 8px 0 0;
+  }
+}
+
+/* ============================================================
+   ANIMATIONS
+   ============================================================ */
+@keyframes fade-in-up {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+@keyframes shimmer {
+  0%   { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+@keyframes price-up {
+  0%,100% { background: transparent; }
+  50%     { background: rgba(0,208,156,.15); }
+}
+@keyframes price-down {
+  0%,100% { background: transparent; }
+  50%     { background: rgba(235,91,60,.15); }
+}
+@keyframes ticker-scroll {
+  0%   { transform: translateX(0); }
+  100% { transform: translateX(-50%); }
+}
+
+.animate-fade-in-up { animation: fade-in-up 0.25s ease-out forwards; }
+.animate-ticker     { animation: ticker-scroll 40s linear infinite; }
+.flash-up           { animation: price-up 0.5s ease; }
+.flash-down         { animation: price-down 0.5s ease; }
+
+/* Focus */
+*:focus-visible { outline: 2px solid #00d09c; outline-offset: 2px; }
+
+/* Groww green button overrides */
+.btn-groww {
+  background: #00d09c;
+  color: #fff;
+  border-radius: 8px;
+  font-weight: 600;
+  transition: background 0.15s;
+}
+.btn-groww:hover { background: #00b88a; }
+.btn-sell {
+  background: #eb5b3c;
+  color: #fff;
+  border-radius: 8px;
+  font-weight: 600;
+  transition: background 0.15s;
+}
+.btn-sell:hover { background: #d14d32; }

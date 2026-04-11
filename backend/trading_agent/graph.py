@@ -19,7 +19,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
-from typing import Any, Dict, Literal
+from typing import Any, Dict, Literal, Optional
 
 from langchain_core.messages import AIMessage, HumanMessage, SystemMessage, ToolMessage
 from langchain_openai import ChatOpenAI
@@ -32,6 +32,9 @@ from .tools.news_fetch import search_financial_news
 from .tools.web_search import web_search
 
 logger = logging.getLogger(__name__)
+
+MAX_SHORT_TERM_MESSAGES = 20
+MAX_LONG_TERM_CHARS = 4000
 
 # All tools available to the agent
 TOOLS = [get_market_snapshot, search_financial_news, web_search]
@@ -129,6 +132,23 @@ IMPORTANT GUIDELINES:
 - Prioritize data accuracy over speculation
 - Use tool data as primary evidence, not opinions
 """
+
+
+def _get_last_ai_text(messages: list) -> Optional[str]:
+    """Extract the most recent assistant text response from messages."""
+    for msg in reversed(messages):
+        if isinstance(msg, AIMessage) and msg.content and not msg.tool_calls:
+            content = msg.content
+            if isinstance(content, list):
+                parts = []
+                for block in content:
+                    if isinstance(block, str):
+                        parts.append(block)
+                    elif isinstance(block, dict) and block.get("type") == "text":
+                        parts.append(block.get("text", ""))
+                return "\n".join(parts).strip()
+            return str(content).strip()
+    return None
 
 
 async def agent_node(state: AgentState) -> Dict[str, Any]:
@@ -243,7 +263,42 @@ def route_after_agent(state: AgentState) -> Literal["tool_executor_node", "end"]
             return "tool_executor_node"
     
     logger.info("No tool calls, ending conversation")
-    return "end"
+    return "memory_update"
+
+
+async def memory_update_node(state: AgentState) -> Dict[str, Any]:
+    """Update short- and long-term memory in state only (no persistence)."""
+    messages = list(state.get("messages", []))
+
+    # Short-term memory: keep recent messages in state.messages
+    if len(messages) > MAX_SHORT_TERM_MESSAGES:
+        messages = messages[-MAX_SHORT_TERM_MESSAGES:]
+
+    # Long-term memory: append a rolling summary string in state.long_term_memory
+    human_input = (state.get("human_input") or "").strip()
+    ai_text = _get_last_ai_text(messages) or ""
+
+    if human_input or ai_text:
+        entry_parts = []
+        if human_input:
+            entry_parts.append(f"User: {human_input}")
+        if ai_text:
+            entry_parts.append(f"Assistant: {ai_text}")
+        new_entry = "\n".join(entry_parts)
+
+        existing = (state.get("long_term_memory") or "").strip()
+        combined = f"{existing}\n\n{new_entry}".strip() if existing else new_entry
+
+        # Trim to most recent chars to avoid unbounded growth
+        if len(combined) > MAX_LONG_TERM_CHARS:
+            combined = combined[-MAX_LONG_TERM_CHARS:]
+
+        return {
+            "messages": messages,
+            "long_term_memory": combined,
+        }
+
+    return {"messages": messages}
 
 
 def build_graph() -> StateGraph:
@@ -253,6 +308,7 @@ def build_graph() -> StateGraph:
     # Add nodes
     builder.add_node("agent_node", agent_node)
     builder.add_node("tool_executor_node", tool_executor_node)
+    builder.add_node("memory_update", memory_update_node)
     
     # Set entry point
     builder.set_entry_point("agent_node")
@@ -263,12 +319,15 @@ def build_graph() -> StateGraph:
         route_after_agent,
         {
             "tool_executor_node": "tool_executor_node",
-            "end": END,
+            "memory_update": "memory_update",
         }
     )
     
     # Loop back: tool executor -> agent for follow-up
     builder.add_edge("tool_executor_node", "agent_node")
+
+    # Final memory update -> end
+    builder.add_edge("memory_update", END)
     
     return builder.compile()
 

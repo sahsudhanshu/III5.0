@@ -1,0 +1,28 @@
+# Phase 3: Authentication UI
+
+## Goal
+
+Build clean and secure auth pages.
+
+## Pages
+
+* Login
+* Signup
+* Forgot Password
+
+## Features
+
+* Form validation
+* Error states
+* Loading states
+* Password visibility toggle
+
+## UX
+
+* Minimal design
+* Smooth transitions
+* Inline validation
+
+## Output
+
+* Fully working frontend auth flow (mocked)

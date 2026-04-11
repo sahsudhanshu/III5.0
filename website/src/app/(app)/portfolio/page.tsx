@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 "use client";
 import { useEffect, useState } from "react";
 import { MOCK_PORTFOLIO, MOCK_SECTOR_ALLOCATION, generatePortfolioHistory } from "@/lib/mock-data";
@@ -68,8 +69,8 @@ export default function PortfolioPage() {
               </defs>
               <CartesianGrid strokeDasharray="3 3" className="opacity-10" vertical={false} />
               <XAxis dataKey="date" tickFormatter={(v) => { const d = new Date(v); return `${d.getDate()}/${d.getMonth()+1}`; }} tick={{ fontSize: 10 }} axisLine={false} tickLine={false} interval="preserveStartEnd" />
-              <YAxis tickFormatter={(v) => `₹${(v/100000).toFixed(0)}L`} tick={{ fontSize: 10 }} axisLine={false} tickLine={false} width={50} />
-              <Tooltip formatter={(v: number) => [formatCurrency(v), "Value"]} contentStyle={{ background: "var(--card)", border: "1px solid var(--border)", borderRadius: "8px", fontSize: "12px" }} />
+            <YAxis tickFormatter={(v) => `$${(v/1000).toFixed(0)}k`} tick={{ fontSize: 10 }} axisLine={false} tickLine={false} width={50} />
+              <Tooltip formatter={(v: any) => [formatCurrency(v), "Value"]} contentStyle={{ background: "var(--card)", border: "1px solid var(--border)", borderRadius: "8px", fontSize: "12px" }} />
               <Area type="monotone" dataKey="value" stroke="oklch(0.65 0.18 151)" strokeWidth={2} fill="url(#grad)" dot={false} />
             </AreaChart>
           </ResponsiveContainer>

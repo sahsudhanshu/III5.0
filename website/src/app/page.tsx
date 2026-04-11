@@ -1,19 +1,19 @@
 "use client";
 import { useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { useAuthStore } from "@/store/auth-store";
+import { useSession } from "next-auth/react";
 
 export default function RootPage() {
   const router = useRouter();
-  const { isAuthenticated } = useAuthStore();
+  const { status } = useSession();
 
   useEffect(() => {
-    if (isAuthenticated) {
+    if (status === "authenticated") {
       router.replace("/dashboard");
-    } else {
+    } else if (status === "unauthenticated") {
       router.replace("/auth/login");
     }
-  }, [isAuthenticated, router]);
+  }, [status, router]);
 
   return (
     <div className="min-h-screen bg-background flex items-center justify-center">

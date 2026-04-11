@@ -16,7 +16,7 @@ export interface User {
 export interface Stock {
   symbol: string;
   name: string;
-  exchange: "NSE" | "BSE";
+  exchange: string;
   sector: string;
   price: number;
   change: number;
@@ -117,7 +117,7 @@ export interface Order {
 export interface WatchlistItem {
   symbol: string;
   name: string;
-  exchange: "NSE" | "BSE";
+  exchange: string;
   price: number;
   change: number;
   changePercent: number;

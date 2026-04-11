@@ -6,7 +6,7 @@ export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
 
-/** Format currency in Indian Rupees */
+/** Format currency in USD */
 export function formatCurrency(
   value: number,
   options?: { compact?: boolean; showSign?: boolean }
@@ -16,21 +16,23 @@ export function formatCurrency(
 
   if (compact) {
     const abs = Math.abs(value);
-    if (abs >= 1_00_00_000) {
-      return `${prefix}₹${(value / 1_00_00_000).toFixed(2)}Cr`;
-    } else if (abs >= 1_00_000) {
-      return `${prefix}₹${(value / 1_00_000).toFixed(2)}L`;
+    if (abs >= 1_000_000_000_000) {
+      return `${prefix}$${(value / 1_000_000_000_000).toFixed(2)}T`;
+    } else if (abs >= 1_000_000_000) {
+      return `${prefix}$${(value / 1_000_000_000).toFixed(2)}B`;
+    } else if (abs >= 1_000_000) {
+      return `${prefix}$${(value / 1_000_000).toFixed(2)}M`;
     } else if (abs >= 1_000) {
-      return `${prefix}₹${(value / 1_000).toFixed(2)}K`;
+      return `${prefix}$${(value / 1_000).toFixed(2)}K`;
     }
-    return `${prefix}₹${value.toFixed(2)}`;
+    return `${prefix}$${value.toFixed(2)}`;
   }
 
   return (
     prefix +
-    new Intl.NumberFormat("en-IN", {
+    new Intl.NumberFormat("en-US", {
       style: "currency",
-      currency: "INR",
+      currency: "USD",
       minimumFractionDigits: 2,
       maximumFractionDigits: 2,
     }).format(value)
@@ -45,12 +47,13 @@ export function formatNumber(
   const { compact = true } = options ?? {};
 
   if (!compact) {
-    return new Intl.NumberFormat("en-IN").format(value);
+    return new Intl.NumberFormat("en-US").format(value);
   }
 
   const abs = Math.abs(value);
-  if (abs >= 1_00_00_000) return `${(value / 1_00_00_000).toFixed(2)}Cr`;
-  if (abs >= 1_00_000) return `${(value / 1_00_000).toFixed(2)}L`;
+  if (abs >= 1_000_000_000_000) return `${(value / 1_000_000_000_000).toFixed(2)}T`;
+  if (abs >= 1_000_000_000) return `${(value / 1_000_000_000).toFixed(2)}B`;
+  if (abs >= 1_000_000) return `${(value / 1_000_000).toFixed(2)}M`;
   if (abs >= 1_000) return `${(value / 1_000).toFixed(2)}K`;
   return value.toString();
 }
@@ -93,7 +96,7 @@ export function formatDate(
       minute: "2-digit",
     },
   };
-  return date.toLocaleDateString("en-IN", formats[style]);
+  return date.toLocaleDateString("en-US", formats[style]);
 }
 
 /** Get color class for a change value */

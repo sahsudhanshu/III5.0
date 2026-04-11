@@ -4,13 +4,13 @@ import { Providers } from "./providers";
 
 export const metadata: Metadata = {
   title: {
-    default: "TradeIQ — Smart Trading & Portfolio Platform",
+    default: "TradeIQ — US Stock Trading Platform",
     template: "%s | TradeIQ",
   },
   description:
-    "A professional-grade smart trading and portfolio management platform for Indian equity markets. Real-time NSE data, AI-powered insights, and beautiful analytics.",
-  keywords: ["trading", "stocks", "NSE", "portfolio", "investment", "Indian market", "BSE"],
-  authors: [{ name: "TradeIQ" }],
+    "A professional-grade smart trading and portfolio management platform for US equity markets. Real-time market data, AI-powered insights, and beautiful analytics.",
+  keywords: ["trading", "stocks", "NASDAQ", "portfolio", "investment", "US market", "NYSE"],
+  authors: [{ name: "TradeIQ Team" }],
 };
 
 export const viewport: Viewport = {

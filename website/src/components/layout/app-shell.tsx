@@ -1,5 +1,7 @@
+import { useEffect } from "react";
 import { Navbar } from "./navbar";
 import { TooltipProvider } from "@/components/ui/tooltip";
+import { useMarketStore } from "@/store/market-store";
 import { useChatStore } from "@/store/chat-store";
 import { Chatbot } from "@/components/layout/chatbot";
 import { AnimatePresence, motion } from "framer-motion";
@@ -9,10 +11,19 @@ interface AppShellProps {
 }
 
 export function AppShell({ children }: AppShellProps) {
+  const { connect, disconnect } = useMarketStore();
+
+  useEffect(() => {
+    connect();
+    return () => {
+      disconnect();
+    };
+  }, [connect, disconnect]);
+
   const { isOpen } = useChatStore();
 
   return (
-    <TooltipProvider delayDuration={300}>
+    <TooltipProvider delay={300}>
       <div className="min-h-screen bg-background flex flex-col">
         {/* Sticky top navbar (no sidebar) */}
         <Navbar />

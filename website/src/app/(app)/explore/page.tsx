@@ -1,32 +1,31 @@
 "use client";
-import { useState, useEffect } from "react";
+import React, { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import {
-  MOCK_STOCKS,
-  MOCK_NEWS,
-  MOCK_SECTOR_ALLOCATION,
-} from "@/lib/mock-data";
-import {
-  formatCurrency, formatPercent, cn, formatNumber,
-} from "@/lib/utils";
+import { MOCK_NEWS } from "@/lib/mock-data";
+import { formatCurrency, formatPercent, cn, formatNumber } from "@/lib/utils";
 import {
   TrendingUp, TrendingDown, ChevronRight, Flame, Star,
   Newspaper, BarChart2, ArrowUpRight, ArrowDownRight,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
-import {
-  AreaChart, Area, ResponsiveContainer, Tooltip,
-} from "recharts";
-import { generateCandlestickData } from "@/lib/mock-data";
+import { AreaChart, Area, ResponsiveContainer } from "recharts";
+import { generateCandlestickData } from "@/lib/mock-data"; 
 import { useWatchlistStore } from "@/store/watchlist-store";
+import { useDataStore, INITIAL_UNIVERSE } from "@/store/data-store";
 import { toast } from "sonner";
 import type { Stock } from "@/types";
 
 // ── Sparkline ──
+// We'll keep dynamic simulated sparklines for dashboards to avoid pulling 5x daily candles APIs 
+// on initial mount for 10 stocks (would be 50 API calls across widgets and instantly rate-limit).
 function Sparkline({ symbol, positive }: { symbol: string; positive: boolean }) {
-  const data = generateCandlestickData(100 + Math.random() * 900, 15, "1W").map((d) => ({
-    v: d.close,
-  }));
+  const data = React.useMemo(() => {
+    const hash = symbol.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0);
+    // Stable pseudo-random generation based on symbol hash to strictly obey React purity rules
+    return generateCandlestickData(100 + (hash % 900), 15, "1W").map((d) => ({
+      v: d.close,
+    }));
+  }, [symbol]);
   const color = positive ? "#00d09c" : "#eb5b3c";
   return (
     <ResponsiveContainer width={72} height={36}>
@@ -45,11 +44,11 @@ function Sparkline({ symbol, positive }: { symbol: string; positive: boolean }) 
 
 // ── Index Card ──
 const INDICES = [
-  { name: "NIFTY 50",   value: 25780.2,  change: 0.62  },
-  { name: "SENSEX",     value: 84920.5,  change: 0.58  },
-  { name: "NIFTY BANK", value: 55230.1,  change: 0.84  },
-  { name: "NIFTY IT",   value: 38450.8,  change: -0.42 },
-  { name: "NIFTY MID",  value: 51340.6,  change: 1.12  },
+  { name: "S&P 500",   value: 5280.2,  change: 0.62  },
+  { name: "NASDAQ",     value: 16920.5,  change: 0.88  },
+  { name: "DOW JONES", value: 39230.1,  change: 0.14  },
+  { name: "RUSSELL 2k",   value: 2050.8,  change: -0.42 },
+  { name: "VIX",  value: 14.6,  change: -5.12  },
 ];
 
 function IndexCard({ name, value, change }: { name: string; value: number; change: number }) {
@@ -58,7 +57,7 @@ function IndexCard({ name, value, change }: { name: string; value: number; chang
     <div className="groww-card p-3.5 flex items-center gap-3 min-w-[164px] hover:shadow-sm transition-shadow cursor-pointer">
       <div className="flex-1 min-w-0">
         <p className="text-xs font-semibold text-muted-foreground truncate">{name}</p>
-        <p className="text-sm font-bold num text-foreground mt-0.5">{value.toLocaleString("en-IN")}</p>
+        <p className="text-sm font-bold num text-foreground mt-0.5">{value.toLocaleString("en-US")}</p>
         <div className={cn("flex items-center gap-0.5 mt-0.5", positive ? "text-bull" : "text-bear")}>
           {positive ? <ArrowUpRight className="w-3 h-3" /> : <ArrowDownRight className="w-3 h-3" />}
           <span className="text-[11px] font-semibold num">{formatPercent(change)}</span>
@@ -148,18 +147,43 @@ function SectionHeader({ title, icon, onViewAll }: { title: string; icon?: React
 export default function ExplorePage() {
   const router = useRouter();
   const [activeSection, setActiveSection] = useState("All");
+  
+  const { stocks, fetchStockProfile } = useDataStore();
   const [loading, setLoading] = useState(true);
 
+  // Load the initial universe of stocks
   useEffect(() => {
-    setTimeout(() => setLoading(false), 600);
-  }, []);
+    async function loadUniverse() {
+      // Execute in parallel but stagger slightly if needed to avoid overwhelming rate limit.
+      // E.g. batch them 3 by 3, but for 10 we might be ok doing Promise.all
+      // However to be extremely safe against 429:
+      setLoading(true);
+      for (const symbol of INITIAL_UNIVERSE) {
+        await fetchStockProfile(symbol);
+        // Small delay
+        await new Promise(r => setTimeout(r, 100)); // 100ms
+      }
+      setLoading(false);
+    }
+    
+    // We only fetch if they aren't all already in store
+    const missing = INITIAL_UNIVERSE.some(sym => !stocks[sym]);
+    if (missing) {
+      loadUniverse();
+    } else {
+      setTimeout(() => setLoading(false), 0);
+    }
+  }, [fetchStockProfile, stocks]);
 
-  const gainers   = [...MOCK_STOCKS].sort((a, b) => b.changePercent - a.changePercent).slice(0, 5);
-  const losers    = [...MOCK_STOCKS].sort((a, b) => a.changePercent - b.changePercent).slice(0, 5);
-  const momentum  = [...MOCK_STOCKS].sort((a, b) => b.volume - a.volume).slice(0, 5);
-  const topPE     = [...MOCK_STOCKS].sort((a, b) => b.pe - a.pe).slice(0, 5);
+  // Derived lists
+  const availableStocks = INITIAL_UNIVERSE.map(s => stocks[s]).filter(Boolean);
+  
+  const gainers   = [...availableStocks].sort((a, b) => b.changePercent - a.changePercent).slice(0, 5);
+  const losers    = [...availableStocks].sort((a, b) => a.changePercent - b.changePercent).slice(0, 5);
+  // Real volume from free Finnhub quote 'v' doesn't exist, we will use mock logic or fall back
+  const momentum  = [...availableStocks].sort((a, b) => Math.abs(b.change) - Math.abs(a.change)).slice(0, 5); 
 
-  const FILTERS = ["All", "Large Cap", "Mid Cap", "IT", "Banking", "Energy", "FMCG"];
+  const FILTERS = ["All", "Tech", "Finance", "Energy", "Retail", "Healthcare"];
 
   return (
     <div className="max-w-[1700px] mx-auto px-4 lg:px-6 py-6 space-y-8">
@@ -204,7 +228,7 @@ export default function ExplorePage() {
               icon={<TrendingUp className="w-4 h-4 text-bull" />}
               onViewAll={() => router.push("/markets")}
             />
-            {loading ? (
+            {loading && gainers.length === 0 ? (
               <div className="space-y-3">
                 {Array.from({ length: 5 }).map((_, i) => (
                   <div key={i} className="flex items-center gap-3 p-2 animate-pulse">
@@ -240,10 +264,10 @@ export default function ExplorePage() {
             </div>
           </div>
 
-          {/* Most Traded */}
+          {/* Top Movers/Momentum */}
           <div className="groww-card p-4">
             <SectionHeader
-              title="Most Traded"
+              title="Top Movers"
               icon={<Flame className="w-4 h-4 text-chart-5" />}
               onViewAll={() => router.push("/markets")}
             />
@@ -328,7 +352,7 @@ export default function ExplorePage() {
           <div className="groww-card p-4">
             <SectionHeader title="52-Week Highs" icon={<TrendingUp className="w-4 h-4 text-bull" />} />
             <div className="space-y-2">
-              {MOCK_STOCKS.filter((s) => s.price / s.high52w > 0.92).slice(0, 4).map((s) => (
+              {availableStocks.filter((s) => s.price / s.high52w > 0.92).slice(0, 4).map((s) => (
                 <div
                   key={s.symbol}
                   className="flex items-center justify-between py-1.5 hover:bg-muted/40 rounded-lg px-1.5 cursor-pointer transition-colors"
@@ -363,7 +387,7 @@ export default function ExplorePage() {
           <table className="w-full">
             <thead>
               <tr className="border-b border-border">
-                {["Company", "Price", "Change", "52W High", "52W Low", "Volume", "P/E", "Mkt Cap"].map((h) => (
+                {["Company", "Price", "Change", "52W High", "52W Low", "P/E", "Mkt Cap"].map((h) => (
                   <th key={h} className="text-left text-[11px] font-semibold text-muted-foreground px-3 py-2.5 whitespace-nowrap">
                     {h}
                   </th>
@@ -371,7 +395,7 @@ export default function ExplorePage() {
               </tr>
             </thead>
             <tbody>
-              {MOCK_STOCKS.map((s) => {
+              {availableStocks.map((s) => {
                 const pos = s.changePercent >= 0;
                 return (
                   <tr
@@ -398,9 +422,8 @@ export default function ExplorePage() {
                     </td>
                     <td className="px-3 py-2.5 text-xs num text-bull font-medium">{formatCurrency(s.high52w)}</td>
                     <td className="px-3 py-2.5 text-xs num text-bear font-medium">{formatCurrency(s.low52w)}</td>
-                    <td className="px-3 py-2.5 text-xs num text-muted-foreground">{formatNumber(s.volume)}</td>
                     <td className="px-3 py-2.5 text-xs num">{s.pe.toFixed(1)}x</td>
-                    <td className="px-3 py-2.5 text-xs num text-muted-foreground">₹{formatNumber(s.marketCap)}Cr</td>
+                    <td className="px-3 py-2.5 text-xs num text-muted-foreground">${formatNumber(s.marketCap)}</td>
                   </tr>
                 );
               })}

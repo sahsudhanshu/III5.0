@@ -13,7 +13,7 @@ import {
   ChevronRight,
   Zap,
   BarChart2,
-  IndianRupee,
+  DollarSign,
 } from "lucide-react";
 import { useState } from "react";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
@@ -48,7 +48,7 @@ export function Sidebar() {
         collapsed && "justify-center px-0"
       )}>
         <div className="flex-shrink-0 w-9 h-9 rounded-xl bg-primary flex items-center justify-center shadow-lg animate-pulse-glow">
-          <IndianRupee className="w-5 h-5 text-primary-foreground" />
+          <DollarSign className="w-5 h-5 text-primary-foreground" />
         </div>
         {!collapsed && (
           <div className="overflow-hidden">
@@ -63,7 +63,7 @@ export function Sidebar() {
         <div className="mx-3 mt-3 mb-1">
           <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-bull-muted">
             <span className="w-2 h-2 rounded-full bg-bull animate-pulse" />
-            <span className="text-bull text-xs font-semibold">NSE OPEN</span>
+            <span className="text-bull text-xs font-semibold">US MARKET OPEN</span>
           </div>
         </div>
       )}
@@ -73,8 +73,8 @@ export function Sidebar() {
         {NAV_ITEMS.map(({ href, label, icon: Icon }) => {
           const isActive = pathname === href || pathname.startsWith(href + "/");
           return (
-            <Tooltip key={href} delayDuration={0}>
-              <TooltipTrigger asChild>
+            <Tooltip key={href}>
+              <TooltipTrigger render={
                 <Link
                   href={href}
                   className={cn(
@@ -88,7 +88,7 @@ export function Sidebar() {
                   <Icon className={cn("w-4.5 h-4.5 flex-shrink-0", isActive && "text-primary")} size={18} />
                   {!collapsed && <span>{label}</span>}
                 </Link>
-              </TooltipTrigger>
+              } />
               {collapsed && (
                 <TooltipContent side="right" className="font-medium">
                   {label}
@@ -111,8 +111,8 @@ export function Sidebar() {
         )}
 
         {BOTTOM_ITEMS.map(({ href, label, icon: Icon }) => (
-          <Tooltip key={href} delayDuration={0}>
-            <TooltipTrigger asChild>
+          <Tooltip key={href}>
+            <TooltipTrigger render={
               <Link
                 href={href}
                 className={cn(
@@ -124,7 +124,7 @@ export function Sidebar() {
                 <Icon size={18} />
                 {!collapsed && <span>{label}</span>}
               </Link>
-            </TooltipTrigger>
+            } />
             {collapsed && (
               <TooltipContent side="right">{label}</TooltipContent>
             )}

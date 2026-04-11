@@ -176,17 +176,34 @@ export function TradingChart({ data, type, height = 400 }: TradingChartProps) {
 
   // Resize handling
   useEffect(() => {
-    const handleResize = () => {
-      if (chartContainerRef.current && chartRef.current) {
-        chartRef.current.applyOptions({
-          width: chartContainerRef.current.clientWidth,
-        });
+    if (!chartContainerRef.current) return;
+
+    const resizeObserver = new ResizeObserver((entries) => {
+      if (entries.length === 0 || entries[0].target !== chartContainerRef.current) {
+        return;
       }
+      
+      const newRect = entries[0].contentRect;
+      if (chartRef.current) {
+        chartRef.current.applyOptions({
+          width: newRect.width,
+        });
+        // Force the chart to keep all data fully visible when squished!
+        if (data && data.length > 0) {
+          chartRef.current.timeScale().setVisibleLogicalRange({
+            from: -0.5,
+            to: data.length - 0.5,
+          });
+        }
+      }
+    });
+
+    resizeObserver.observe(chartContainerRef.current);
+
+    return () => {
+      resizeObserver.disconnect();
     };
-    
-    window.addEventListener("resize", handleResize);
-    return () => window.removeEventListener("resize", handleResize);
-  }, []);
+  }, [data]);
 
   return (
     <div className="w-full relative group">

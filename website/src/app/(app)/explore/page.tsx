@@ -162,7 +162,7 @@ export default function ExplorePage() {
   const FILTERS = ["All", "Large Cap", "Mid Cap", "IT", "Banking", "Energy", "FMCG"];
 
   return (
-    <div className="max-w-screen-xl mx-auto px-4 lg:px-6 py-6 space-y-8">
+    <div className="max-w-[1700px] mx-auto px-4 lg:px-6 py-6 space-y-8">
 
       {/* ── Indices Strip ── */}
       <section>

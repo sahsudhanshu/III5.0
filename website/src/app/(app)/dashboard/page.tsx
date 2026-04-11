@@ -43,7 +43,7 @@ export default function DashboardPage() {
   const firstName = user?.name?.split(" ")[0] ?? "Investor";
 
   return (
-    <div className="max-w-screen-xl mx-auto px-4 lg:px-6 py-6 space-y-6">
+    <div className="max-w-[1700px] mx-auto px-4 lg:px-6 py-6 space-y-6">
 
       {/* ── Welcome ── */}
       <div className="flex items-center justify-between">

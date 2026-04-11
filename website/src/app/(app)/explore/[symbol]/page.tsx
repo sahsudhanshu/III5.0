@@ -10,6 +10,8 @@ import { Input } from "@/components/ui/input";
 import { useWatchlistStore } from "@/store/watchlist-store";
 import { useChatStore } from "@/store/chat-store";
 import { ChartSkeleton } from "@/components/common/skeletons";
+import { AnimatePresence, motion } from "framer-motion";
+import { Chatbot } from "@/components/layout/chatbot";
 import { toast } from "sonner";
 import {
   TrendingUp, TrendingDown, Star, Bot, ArrowLeft,
@@ -32,7 +34,7 @@ export default function StockDetailPage() {
 
   // ── All hooks first — no early returns before this ──
   const { isInWatchlist, addToWatchlist, removeFromWatchlist } = useWatchlistStore();
-  const { setContext, openChat } = useChatStore();
+  const { setContext, openChat, isOpen } = useChatStore();
 
   const [loading, setLoading] = useState(true);
   const [chartData, setChartData] = useState<CandlestickDataPoint[]>([]);
@@ -100,7 +102,7 @@ export default function StockDetailPage() {
   }
 
   return (
-    <div className="max-w-screen-xl mx-auto px-4 lg:px-6 py-6">
+    <div className="max-w-[1700px] mx-auto px-4 lg:px-6 py-6 font-geist">
       {/* ── Breadcrumb ── */}
       <div className="flex items-center gap-2 mb-6 text-sm text-muted-foreground">
         <button onClick={() => router.back()} className="hover:text-foreground transition-colors flex items-center gap-1">
@@ -112,7 +114,7 @@ export default function StockDetailPage() {
 
       <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
         {/* ── Left: Chart + Tabs ── */}
-        <div className="xl:col-span-2 space-y-4">
+        <div className="xl:col-span-2 space-y-4 min-w-0">
 
           {/* Stock header */}
           <div className="groww-card p-5">
@@ -319,102 +321,102 @@ export default function StockDetailPage() {
         </div>
 
         {/* ── Right: Order Panel ── */}
-        <div className="space-y-4">
-          {/* Order widget */}
-          <div className="groww-card p-4 space-y-4">
-            {/* BUY / SELL tabs */}
-            <div className="flex rounded-xl overflow-hidden border border-border">
-              <button
-                onClick={() => setOrderType("BUY")}
-                className={cn("flex-1 py-2.5 text-sm font-bold transition-all", orderType === "BUY" ? "bg-bull text-white" : "bg-transparent text-muted-foreground hover:text-foreground")}
-              >
-                BUY
-              </button>
-              <button
-                onClick={() => setOrderType("SELL")}
-                className={cn("flex-1 py-2.5 text-sm font-bold transition-all border-l border-border", orderType === "SELL" ? "bg-bear text-white" : "bg-transparent text-muted-foreground hover:text-foreground")}
-              >
-                SELL
-              </button>
-            </div>
-
-            {/* Form */}
-            <div className="space-y-3">
-              <div>
-                <label className="text-xs text-muted-foreground font-medium">Market Price</label>
-                <div className="mt-1.5 h-10 px-3 rounded-lg bg-muted flex items-center">
-                  <span className="text-sm font-bold num">{formatCurrency(stock.price)}</span>
-                </div>
-              </div>
-              <div>
-                <label className="text-xs text-muted-foreground font-medium">Quantity</label>
-                <Input type="number" min="1" value={qty} onChange={(e) => setQty(e.target.value)} className="mt-1.5 h-10" />
-              </div>
-
-              <div className="flex items-center justify-between py-2.5 px-3 bg-muted/50 rounded-lg">
-                <span className="text-xs text-muted-foreground">Order Value</span>
-                <span className="text-sm font-bold num">{formatCurrency(parseInt(qty || "0") * stock.price)}</span>
-              </div>
-
-              <button
-                onClick={handleOrder}
-                disabled={orderLoading}
-                className={cn(
-                  "w-full py-3 rounded-xl text-sm font-bold text-white transition-all disabled:opacity-70",
-                  orderType === "BUY" ? "btn-groww" : "btn-sell"
-                )}
-              >
-                {orderLoading
-                  ? <span className="flex items-center justify-center gap-2"><div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />Placing…</span>
-                  : `${orderType} ${stock.symbol}`
-                }
-              </button>
-              <p className="text-[10px] text-muted-foreground text-center">Simulated — no real money involved</p>
-            </div>
-          </div>
-
-          {/* Key Metrics */}
-          <div className="groww-card p-4 space-y-3">
-            <p className="text-sm font-bold text-foreground">Key Metrics</p>
-            {[
-              { label: "52-Week High",  value: formatCurrency(stock.high52w),           color: "text-bull" },
-              { label: "52-Week Low",   value: formatCurrency(stock.low52w),            color: "text-bear" },
-              { label: "Beta",          value: stock.beta.toFixed(2),                   color: "" },
-              { label: "Div. Yield",    value: `${stock.dividendYield.toFixed(2)}%`,    color: "" },
-            ].map(({ label, value, color }) => (
-              <div key={label} className="flex items-center justify-between py-1.5 border-b border-border/50 last:border-0">
-                <span className="text-xs text-muted-foreground">{label}</span>
-                <span className={cn("text-xs font-semibold num", color)}>{value}</span>
-              </div>
-            ))}
-          </div>
-
-          {/* Similar stocks */}
-          <div className="groww-card p-4">
-            <p className="text-sm font-bold text-foreground mb-3">Similar Stocks</p>
-            <div className="space-y-2">
-              {MOCK_STOCKS.filter((s) => s.sector === stock.sector && s.symbol !== stock.symbol).slice(0, 4).map((s) => (
-                <div
-                  key={s.symbol}
-                  className="flex items-center gap-2 p-2 rounded-lg hover:bg-muted/50 cursor-pointer transition-colors"
-                  onClick={() => router.push(`/explore/${s.symbol}`)}
-                >
-                  <div className="w-7 h-7 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
-                    <span className="text-[9px] font-black text-primary">{s.symbol.slice(0,2)}</span>
+        <div className="xl:col-span-1 space-y-4 shrink-0">
+                {/* Order widget */}
+                <div className="groww-card p-4 space-y-4">
+                  {/* BUY / SELL tabs */}
+                  <div className="flex rounded-xl overflow-hidden border border-border">
+                    <button
+                      onClick={() => setOrderType("BUY")}
+                      className={cn("flex-1 py-2.5 text-sm font-bold transition-all", orderType === "BUY" ? "bg-bull text-white" : "bg-transparent text-muted-foreground hover:text-foreground")}
+                    >
+                      BUY
+                    </button>
+                    <button
+                      onClick={() => setOrderType("SELL")}
+                      className={cn("flex-1 py-2.5 text-sm font-bold transition-all border-l border-border", orderType === "SELL" ? "bg-bear text-white" : "bg-transparent text-muted-foreground hover:text-foreground")}
+                    >
+                      SELL
+                    </button>
                   </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-xs font-semibold truncate">{s.symbol}</p>
-                  </div>
-                  <div className="text-right flex-shrink-0">
-                    <p className="text-xs font-bold num">{formatCurrency(s.price)}</p>
-                    <p className={cn("text-[10px] font-medium num", s.changePercent >= 0 ? "text-bull" : "text-bear")}>
-                      {s.changePercent >= 0 ? "+" : ""}{formatPercent(s.changePercent)}
-                    </p>
+
+                  {/* Form */}
+                  <div className="space-y-3">
+                    <div>
+                      <label className="text-xs text-muted-foreground font-medium">Market Price</label>
+                      <div className="mt-1.5 h-10 px-3 rounded-lg bg-muted flex items-center">
+                        <span className="text-sm font-bold num">{formatCurrency(stock.price)}</span>
+                      </div>
+                    </div>
+                    <div>
+                      <label className="text-xs text-muted-foreground font-medium">Quantity</label>
+                      <Input type="number" min="1" value={qty} onChange={(e) => setQty(e.target.value)} className="mt-1.5 h-10" />
+                    </div>
+
+                    <div className="flex items-center justify-between py-2.5 px-3 bg-muted/50 rounded-lg">
+                      <span className="text-xs text-muted-foreground">Order Value</span>
+                      <span className="text-sm font-bold num">{formatCurrency(parseInt(qty || "0") * stock.price)}</span>
+                    </div>
+
+                    <button
+                      onClick={handleOrder}
+                      disabled={orderLoading}
+                      className={cn(
+                        "w-full py-3 rounded-xl text-sm font-bold text-white transition-all disabled:opacity-70",
+                        orderType === "BUY" ? "btn-groww" : "btn-sell"
+                      )}
+                    >
+                      {orderLoading
+                        ? <span className="flex items-center justify-center gap-2"><div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />Placing…</span>
+                        : `${orderType} ${stock.symbol}`
+                      }
+                    </button>
+                    <p className="text-[10px] text-muted-foreground text-center">Simulated — no real money involved</p>
                   </div>
                 </div>
-              ))}
-            </div>
-          </div>
+
+                {/* Key Metrics */}
+                <div className="groww-card p-4 space-y-3">
+                  <p className="text-sm font-bold text-foreground">Key Metrics</p>
+                  {[
+                    { label: "52-Week High",  value: formatCurrency(stock.high52w),           color: "text-bull" },
+                    { label: "52-Week Low",   value: formatCurrency(stock.low52w),            color: "text-bear" },
+                    { label: "Beta",          value: stock.beta.toFixed(2),                   color: "" },
+                    { label: "Div. Yield",    value: `${stock.dividendYield.toFixed(2)}%`,    color: "" },
+                  ].map(({ label, value, color }) => (
+                    <div key={label} className="flex items-center justify-between py-1.5 border-b border-border/50 last:border-0">
+                      <span className="text-xs text-muted-foreground">{label}</span>
+                      <span className={cn("text-xs font-semibold num", color)}>{value}</span>
+                    </div>
+                  ))}
+                </div>
+
+                {/* Similar stocks */}
+                <div className="groww-card p-4">
+                  <p className="text-sm font-bold text-foreground mb-3">Similar Stocks</p>
+                  <div className="space-y-2">
+                    {MOCK_STOCKS.filter((s) => s.sector === stock.sector && s.symbol !== stock.symbol).slice(0, 4).map((s) => (
+                      <div
+                        key={s.symbol}
+                        className="flex items-center gap-2 p-2 rounded-lg hover:bg-muted/50 cursor-pointer transition-colors"
+                        onClick={() => router.push(`/explore/${s.symbol}`)}
+                      >
+                        <div className="w-7 h-7 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
+                          <span className="text-[9px] font-black text-primary">{s.symbol.slice(0,2)}</span>
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-xs font-semibold truncate">{s.symbol}</p>
+                        </div>
+                        <div className="text-right flex-shrink-0">
+                          <p className="text-xs font-bold num">{formatCurrency(s.price)}</p>
+                          <p className={cn("text-[10px] font-medium num", s.changePercent >= 0 ? "text-bull" : "text-bear")}>
+                            {s.changePercent >= 0 ? "+" : ""}{formatPercent(s.changePercent)}
+                          </p>
+                        </div>
+                      </div>
+                    ))}
+                </div>
+              </div>
         </div>
       </div>
     </div>

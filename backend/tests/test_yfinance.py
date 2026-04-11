@@ -2,11 +2,14 @@
 """Test yfinance with timeout and fallback."""
 
 import sys
-sys.path.insert(0, 'src')
+from pathlib import Path
+
+BACKEND_ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(BACKEND_ROOT))
 
 import time
-from trading_agent.tools.market_data import get_market_snapshot
-from trading_agent.config import get_proxy_dict
+from src.trading_agent.tools.market_data import get_market_snapshot
+from src.trading_agent.config import get_proxy_dict
 
 print("=" * 60)
 print("YFINANCE TEST WITH PROXY & TIMEOUT")

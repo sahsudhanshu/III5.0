@@ -4,17 +4,19 @@ Proxy configuration test script.
 Validates that proxy settings are properly configured and working.
 """
 
-import sys
 import logging
 import os
+import sys
 from pathlib import Path
+
 from dotenv import load_dotenv
 
 # Load environment first
-load_dotenv()
+BACKEND_ROOT = Path(__file__).resolve().parents[1]
+load_dotenv(BACKEND_ROOT / ".env")
 
-# Add src to path
-sys.path.insert(0, str(Path(__file__).parent / "src"))
+# Add backend root to path
+sys.path.insert(0, str(BACKEND_ROOT))
 
 logging.basicConfig(
     level=logging.INFO,
@@ -43,7 +45,7 @@ def test_proxy_config():
         logger.info(f"  - CONNECTION_TIMEOUT: {connection_timeout}s")
         
         # Test proxy dict function
-        from trading_agent.config import get_proxy_dict, get_proxy_settings
+        from src.trading_agent.config import get_proxy_dict, get_proxy_settings
         
         use_proxy_env, proxy_address_env, proxy_port_env = get_proxy_settings()
         proxy_dict = get_proxy_dict()
@@ -62,7 +64,7 @@ def test_proxy_config():
         # Test market data tool imports
         logger.info(f"\n📊 Testing Market Data Tool Import...")
         try:
-            from trading_agent.tools.market_data import get_market_snapshot
+            from src.trading_agent.tools.market_data import get_market_snapshot
             logger.info(f"  ✓ Market data tool imported successfully")
             logger.info(f"    - Proxy support: YES (session-based)")
         except Exception as e:
@@ -71,7 +73,7 @@ def test_proxy_config():
         # Test web search tool imports
         logger.info(f"\n🔍 Testing Web Search Tool Import...")
         try:
-            from trading_agent.tools.web_search import search_financial_news
+            from src.trading_agent.tools.web_search import search_financial_news
             logger.info(f"  ✓ Web search tool imported successfully")
             logger.info(f"    - Proxy support: YES (requests-based)")
         except Exception as e:

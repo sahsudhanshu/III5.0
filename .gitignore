@@ -3,3 +3,5 @@ __pycache__/
 *.pyc
 .env
 trading_memory.db
+final_trading_model
+outputs/

@@ -1,5 +1,4 @@
-"""
-Financial news tool - znews API.
+"""Financial news tool - gnews API.
 
 Gives the agent access to real-time financial news for trading analysis,
 market sentiment, corporate news, earnings announcements, and regulatory updates.
@@ -13,7 +12,7 @@ from langchain_core.tools import tool
 @tool
 async def search_financial_news(query: str, max_results: int = 5) -> str:
     """
-    Search for financial news using znews API with fallback to mock data.
+    Search for financial news using gnews API with fallback to mock data.
     
     Fetches real-time financial news articles from multiple sources for
     analyzing market sentiment, corporate events, and trading catalysts.
@@ -32,30 +31,30 @@ async def search_financial_news(query: str, max_results: int = 5) -> str:
     
     max_results = min(max(1, max_results), 20)
     
-    # Try to fetch real news from znews
+    # Try to fetch real news from gnews
     try:
-        import gnews
+        from gnews import GNews
+        google_news = GNews(max_results=max_results * 2)
         loop = asyncio.get_event_loop()
         articles = await loop.run_in_executor(
             None, 
-            gnews.get_news, 
-            query, 
-            max_results * 2  # Fetch more to have buffer after filtering
+            google_news.get_news,
+            query,
         )
         
         if articles:
             return _format_news_results(query, articles, max_results)
     except ImportError:
-        print("⚠️ znews not installed, using fallback")
+        print("⚠️ gnews not installed, using fallback")
     except Exception as e:
-        print(f"⚠️ znews fetch error: {e}")
+        print(f"⚠️ gnews fetch error: {e}")
     
     # Fallback to mock news data
     return _get_mock_financial_news(query, max_results)
 
 
 def _format_news_results(query: str, articles: list, max_results: int) -> str:
-    """Format znews articles into readable output."""
+    """Format gnews articles into readable output."""
     lines = [f"📰 Financial News: {query}\n"]
     
     if not articles:
@@ -73,6 +72,8 @@ def _format_news_results(query: str, articles: list, max_results: int) -> str:
             
             title = article.get("title", "").strip()
             source = article.get("source", "Unknown")
+            if isinstance(source, dict):
+                source = source.get("title", "Unknown")
             url = article.get("url", "")
             summary = article.get("description") or article.get("summary", "")
             summary = summary.strip() if summary else ""

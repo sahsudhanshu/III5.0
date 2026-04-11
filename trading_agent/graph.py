@@ -198,6 +198,22 @@ async def tool_executor_node(state: AgentState) -> Dict[str, Any]:
         """Run a single tool call."""
         tool_name = call["name"]
         tool_args = dict(call["args"])
+
+        if tool_name == "get_market_snapshot":
+            symbols = tool_args.get("symbols")
+            if isinstance(symbols, str):
+                stripped = symbols.strip()
+                if stripped.startswith("[") and stripped.endswith("]"):
+                    try:
+                        import json
+                        parsed = json.loads(stripped)
+                        if isinstance(parsed, list):
+                            symbols = parsed
+                    except Exception:
+                        pass
+                else:
+                    symbols = [s.strip() for s in symbols.split(",") if s.strip()]
+                tool_args["symbols"] = symbols
         
         if tool_name not in TOOL_MAP:
             return {
@@ -208,17 +224,15 @@ async def tool_executor_node(state: AgentState) -> Dict[str, Any]:
         
         try:
             tool_func = TOOL_MAP[tool_name]
-            # Check if tool's underlying function is async
-            if asyncio.iscoroutinefunction(tool_func.func):
-                result = await tool_func.func(**tool_args)
+            # Prefer the tool interface; it handles sync/async correctly.
+            if hasattr(tool_func, "ainvoke"):
+                result = await tool_func.ainvoke(tool_args)
             else:
-                # Fallback for sync tools
-                loop = asyncio.get_event_loop()
-                result = await loop.run_in_executor(None, lambda: tool_func.func(**tool_args))
-            
+                result = tool_func.invoke(tool_args)
+
             result_str = str(result) if not isinstance(result, (list, dict)) else str(result)[:2000]
             logger.info(f"✓ Tool {tool_name} executed successfully")
-            
+
         except Exception as e:
             logger.error(f"Tool {tool_name} execution failed: {e}")
             result_str = f"⚠️ Tool error: {str(e)}"

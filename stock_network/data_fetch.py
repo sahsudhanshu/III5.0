@@ -1,13 +1,18 @@
 """Stock data fetching with yfinance timeout, CSV fallback, and mock data."""
 
 from typing import Dict, List, Optional
-import pandas as pd, logging, os, threading, hashlib
+import pandas as pd
+import logging
+import os
+import threading
+import hashlib
 from datetime import datetime, timedelta
 from pathlib import Path
 from io import StringIO
 
 logger = logging.getLogger(__name__)
 
+# Load environment
 env_file = Path(__file__).parent.parent / ".env"
 if env_file.exists():
     try:
@@ -16,13 +21,15 @@ if env_file.exists():
     except:
         pass
 
+# Proxy config
 PROXY_ADDRESS = os.environ.get("PROXY_ADDRESS", "172.31.2.4")
 PROXY_PORT = os.environ.get("PROXY_PORT", "8080")
-USE_PROXY = os.environ.get("USE_PROXY", "true").lower() == "true"
+USE_PROXY = os.environ.get("USE_PROXY", "false").lower() == "true"
+
 PROXY_URL = f"http://{PROXY_ADDRESS}:{PROXY_PORT}" if USE_PROXY else None
 PROXIES = {"http": PROXY_URL, "https": PROXY_URL} if PROXY_URL else {}
 
-logger.info(f"🔌 Proxy: {'Enabled - ' + PROXY_URL if PROXY_URL else 'Disabled'}")
+logger.debug(f"🔌 Proxy: {'Enabled' if PROXY_URL else 'Disabled'}")
 
 try:
     import yfinance as yf
@@ -148,6 +155,7 @@ def _fetch_alternative(ticker: str, period: str) -> Optional[pd.DataFrame]:
 def _get_mock_data(ticker: str, period: str) -> Optional[pd.DataFrame]:
     """Generate mock data."""
     try:
+        logger.debug(f"  Generating mock data for {ticker}...")
         period_days = {"1mo": 30, "3mo": 90, "6mo": 180, "1y": 365, "2y": 730, "5y": 1825}
         days = period_days.get(period, 180)
         
@@ -212,70 +220,20 @@ def get_close_prices(data: Dict[str, pd.DataFrame]) -> pd.DataFrame:
     if not data:
         raise ValueError("No data")
     
-    close_data = {}
+    series_list = []
     for ticker, df in data.items():
         series = df['Adj Close'] if 'Adj Close' in df.columns else df['Close']
         if isinstance(series.index, pd.DatetimeIndex):
             norm_idx = pd.to_datetime(series.index.date)
             series = series.copy()
             series.index = norm_idx
-        close_data[ticker] = series
+        series.name = ticker
+        series_list.append(series)
     
-    prices = pd.DataFrame(close_data)
+    # Use concat instead of DataFrame constructor to handle alignment properly
+    prices = pd.concat(series_list, axis=1)
     logger.info(f"✓ Close prices: {prices.shape}")
     return prices
-"""Stock network data fetching - yfinance with timeout, CSV fallback, and mock data."""
-
-from typing import Dict, List, Optional
-import pandas as pd
-import logging
-from datetime import datetime, timedelta
-import os
-from pathlib import Path
-from io import StringIO
-import threading
-import hashlib
-
-logger = logging.getLogger(__name__)
-
-# Load environment
-env_file = Path(__file__).parent.parent / ".env"
-if env_file.exists():
-    try:
-        import dotenv
-        dotenv.load_dotenv(env_file)
-    except:
-        pass
-
-# Proxy config
-PROXY_ADDRESS = os.environ.get("PROXY_ADDRESS", "172.31.2.4")
-PROXY_PORT = os.environ.get("PROXY_PORT", "8080")
-USE_PROXY = os.environ.get("USE_PROXY", "true").lower() == "true"
-
-PROXY_URL = f"http://{PROXY_ADDRESS}:{PROXY_PORT}" if USE_PROXY else None
-PROXIES = {"http": PROXY_URL, "https": PROXY_URL} if PROXY_URL else {}
-
-logger.info(f"🔌 Proxy: {'Enabled - ' + PROXY_URL if PROXY_URL else 'Disabled'}")
-
-try:
-    import yfinance as yf
-    HAS_YFINANCE = True
-except ImportError:
-    HAS_YFINANCE = False
-
-try:
-    import requests
-    HAS_REQUESTS = True
-except ImportError:
-    HAS_REQUESTS = False
-
-
-def fetch_stock_data(
-    tickers: List[str],
-    period: str = "6mo",
-    interval: str = "1d"
-) -> Dict[str, pd.DataFrame]:
-    """Fetch stock data pri: yfinance → CSV → mock."""
     data = {}
     
     for ticker in tickers:

@@ -6,6 +6,10 @@ Run this to test everything in under 30 seconds
 
 import subprocess
 import sys
+from pathlib import Path
+
+BACKEND_ROOT = Path(__file__).resolve().parents[1]
+REPO_ROOT = BACKEND_ROOT.parent
 
 def run_command(cmd, description):
     """Run a command and report results."""
@@ -31,7 +35,7 @@ def main():
     # Step 1: Validate
     print("\n📋 STEP 1: Validating entire system...")
     validate_ok = run_command(
-        "python validate_pipeline.py",
+        f"python {BACKEND_ROOT / 'validation' / 'validate_pipeline.py'}",
         "Running comprehensive validation"
     )
     
@@ -45,7 +49,7 @@ def main():
     # Step 2: Run sample analysis
     print("\n📊 STEP 2: Running sample market analysis...")
     run_ok = run_command(
-        'python main.py --query "Should we invest in technology?" --symbols NVDA MSFT GOOG --output sample_output.json --verbose',
+        f'python {BACKEND_ROOT / "app" / "main.py"} --query "Should we invest in technology?" --symbols NVDA MSFT GOOG --output sample_output.json --verbose',
         "Running trading agent pipeline with sample query"
     )
     
@@ -76,9 +80,9 @@ Next steps:
    
 Tips:
 • Use --verbose flag for detailed logging
-• Customize risk constraints in src/trading_agent/agents.py  
-• Add real market data APIs to src/trading_agent/tools/market_data.py
-• Query memory for past decisions using src/trading_agent/memory/long_term.py
+    • Customize risk constraints in backend/src/trading_agent/agents.py  
+    • Add real market data APIs to backend/src/trading_agent/tools/market_data.py
+    • Query memory for past decisions using backend/src/trading_agent/memory/long_term.py
 """)
     
     print("="*60)

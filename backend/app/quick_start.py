@@ -12,9 +12,12 @@ Or step-by-step with option prompts:
 """
 
 import os
-import sys
 import subprocess
+import sys
 from pathlib import Path
+
+BACKEND_ROOT = Path(__file__).resolve().parents[1]
+REPO_ROOT = BACKEND_ROOT.parent
 
 
 def print_header(title):
@@ -31,16 +34,16 @@ def check_and_install_deps():
     # Trading agent deps
     print("📦 Installing trading agent dependencies...")
     subprocess.run(
-        [sys.executable, "-m", "pip", "install", "-q", "-r", "requirements.txt"],
-        capture_output=True
+        [sys.executable, "-m", "pip", "install", "-q", "-r", str(BACKEND_ROOT / "requirements.txt")],
+        capture_output=True,
     )
     print("   ✓ Trading agent: OK")
     
     # Stock network deps
     print("📦 Installing stock network dependencies...")
     subprocess.run(
-        [sys.executable, "-m", "pip", "install", "-q", "-r", "stock_network/requirements.txt"],
-        capture_output=True
+        [sys.executable, "-m", "pip", "install", "-q", "-r", str(BACKEND_ROOT / "stock_network/requirements.txt")],
+        capture_output=True,
     )
     print("   ✓ Stock network: OK")
     
@@ -51,7 +54,7 @@ def setup_env():
     """Setup environment variables."""
     print_header("STEP 2: Environment Setup")
     
-    env_file = Path(".env")
+    env_file = BACKEND_ROOT / ".env"
     
     if env_file.exists():
         print("✓ .env file already exists")
@@ -82,9 +85,10 @@ def validate_setup():
     print_header("STEP 3: Validating Setup")
     
     result = subprocess.run(
-        [sys.executable, "validate_system.py"],
+        [sys.executable, str(BACKEND_ROOT / "validation/validate_system.py")],
         capture_output=True,
-        text=True
+        text=True,
+        cwd=BACKEND_ROOT,
     )
     
     if result.returncode == 0:
@@ -101,7 +105,7 @@ def demo_trading_agent():
     print_header("OPTION 1: Trading Agent (Terminal)\n")
     
     print("The trading agent analyzes stocks using LLM + real market data.\n")
-    print("Command: python main.py\n")
+    print("Command: python backend/app/main.py\n")
     print("Example interaction:")
     print("─" * 60)
     print("You: Should I buy Apple right now?")
@@ -117,7 +121,7 @@ def demo_trading_agent():
     proceed = input("\n✓ Ready to start? Run it now? (y/n): ").lower().strip()
     if proceed == 'y':
         print("\nStarting trading agent...")
-        subprocess.run([sys.executable, "main.py"])
+        subprocess.run([sys.executable, str(BACKEND_ROOT / "app/main.py")], cwd=BACKEND_ROOT)
 
 
 def demo_stock_network_web():
@@ -126,7 +130,7 @@ def demo_stock_network_web():
     
     print("Stock Network visualizes relationships between stocks.")
     print("It detects correlations, lags, and market clusters.\n")
-    print("Command: streamlit run stock_network/app.py\n")
+    print("Command: streamlit run backend/stock_network/app.py\n")
     print("Features:")
     print("  • Network graph visualization (interactive)")
     print("  • Correlation heatmap")
@@ -137,8 +141,7 @@ def demo_stock_network_web():
     proceed = input("\n✓ Ready to start? Run it now? (y/n): ").lower().strip()
     if proceed == 'y':
         print("\nStarting stock network...")
-        os.chdir("stock_network")
-        subprocess.run(["streamlit", "run", "app.py"])
+        subprocess.run(["streamlit", "run", "app.py"], cwd=BACKEND_ROOT / "stock_network")
 
 
 def demo_stock_network_script():
@@ -146,13 +149,14 @@ def demo_stock_network_script():
     print_header("OPTION 3: Stock Network (Quick Script)\n")
     
     print("Quick analysis without web UI (prints to terminal).")
-    print("Command: python stock_network/demo.py AAPL,MSFT\n")
+    print("Command: python backend/stock_network/demo.py AAPL,MSFT\n")
     
     proceed = input("✓ Run demo? (y/n): ").lower().strip()
     if proceed == 'y':
         print("\nRunning stock network analysis...")
         subprocess.run(
-            [sys.executable, "stock_network/demo.py", "AAPL,MSFT,GOOGL,NVDA"],
+            [sys.executable, str(BACKEND_ROOT / "stock_network/demo.py"), "AAPL,MSFT,GOOGL,NVDA"],
+            cwd=BACKEND_ROOT,
         )
 
 
@@ -192,7 +196,7 @@ def interactive_menu():
         print("   • QUICKSTART.md - Complete setup guide")
         print("   • INDEX.md - Full system architecture")
         print("   • FEATURES.md - Feature checklist")
-        print("   • stock_network/README.md - Stock network details")
+        print("   • backend/stock_network/README.md - Stock network details")
     elif choice == '5':
         validate_setup()
     elif choice == '0':

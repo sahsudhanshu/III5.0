@@ -4,6 +4,12 @@ Quick test of the 3-node simplified pipeline.
 Tests: market data API, news search, and risk assessment.
 """
 
+import sys
+from pathlib import Path
+
+BACKEND_ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(BACKEND_ROOT))
+
 from src.trading_agent.graph import build_graph
 from src.trading_agent.tools.market_data import get_market_snapshot
 from src.trading_agent.tools.web_search import search_financial_news

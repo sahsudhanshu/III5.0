@@ -1,9 +1,12 @@
 #!/usr/bin/env python3
 """Test stock_network data_fetch with fixed yfinance timeout."""
 
-import sys
 import importlib
-sys.path.insert(0, 'stock_network')
+import sys
+from pathlib import Path
+
+BACKEND_ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(BACKEND_ROOT / "stock_network"))
 
 # Force reload
 if 'data_fetch' in sys.modules:

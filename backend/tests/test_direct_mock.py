@@ -2,7 +2,10 @@
 """Direct test of data_fetch mock fallback."""
 
 import sys
-sys.path.insert(0, 'stock_network')
+from pathlib import Path
+
+BACKEND_ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(BACKEND_ROOT / "stock_network"))
 
 # Test direct import
 if 'data_fetch' in sys.modules:

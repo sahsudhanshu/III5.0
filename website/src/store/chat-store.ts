@@ -27,30 +27,26 @@ const GREETING: ChatMessage = {
 
 // Simulated AI responses based on keywords
 const getAIResponse = (message: string, context: string | null): string => {
-  const msg = message.toLowerCase();
+  const lowerMsg = message.toLowerCase();
 
-  if (msg.includes("reliance") || msg.includes("ril")) {
-    return "**Reliance Industries (RELIANCE)** is currently trading at ₹2,847.5 (+1.22%). \n\n📊 Key metrics:\n• P/E: 24.3x\n• Market Cap: ₹19.2L Cr\n• 52W High: ₹3,217.9\n\n🏭 Jio and retail segments are driving growth. Analyst consensus: **BUY** with a target of ₹3,150.";
+  if (lowerMsg.includes("apple") || lowerMsg.includes("aapl")) {
+    return "**Apple Inc. (AAPL)** is currently trading at $185.85 (+1.28%). \n\n📊 Key metrics:\n• P/E: 28.3x\n• Market Cap: $2.92T\n• 52W High: $199.62\n\n🏭 Services segment is driving growth. Analyst consensus: **BUY** with a target of $210.";
   }
 
-  if (msg.includes("portfolio") || msg.includes("my holdings")) {
-    return "📈 Your portfolio is up **+11.28%** overall!\n\n**Top performers:**\n• RELIANCE: +18.15%\n• TATAMOTORS: +13.49%\n• ICICIBANK: +11.17%\n\n**Laggard:**\n• INFY: -4.19%\n\nYour portfolio is well-diversified across 5 sectors. Consider rebalancing IT exposure as the sector faces near-term headwinds.";
+  if (lowerMsg.includes("recommend") || lowerMsg.includes("buy")) {
+    return "Based on your current portfolio, you might want to consider **MSFT** (Cloud growth momentum) or **TSLA** (If you have a high risk appetite, currently down 12% from recent highs).\n\n*Note: This is AI-generated advice and not financial counsel.*";
   }
 
-  if (msg.includes("nifty") || msg.includes("market")) {
-    return "📊 **Market Update:**\n• Nifty 50: 25,780 (+0.62%)\n• Sensex: 84,920 (+0.58%)\n• FII: ₹+4,200 Cr (Buyers)\n• DII: ₹-1,800 Cr (Sellers)\n\n🟢 **Sectors advancing:** Auto, Banking, FMCG\n🔴 **Sectors declining:** IT, Pharma\n\nGlobal cues are positive — Nasdaq futures up 0.4%. Expect range-bound trading between 25,500–26,000.";
+  if (lowerMsg.includes("market") || lowerMsg.includes("update")) {
+    return "📊 **Market Update:**\n• S&P 500: 5,280 (+0.62%)\n• Nasdaq: 16,920 (+0.88%)\n\n🟢 **Sectors advancing:** Tech, Consumer Cyclical\n🔴 **Sectors declining:** Healthcare, Utilities\n\nGlobal cues are positive. Expect range-bound trading into the close.";
   }
 
-  if (msg.includes("buy") || msg.includes("invest")) {
-    return "💡 **Top Picks for Today:**\n\n1. **ICICIBANK** — Strong Q3 results, NIM expansion expected. Target: ₹1,200\n2. **TATAMOTORS** — JLR delivery momentum. Target: ₹1,100\n3. **BAJFINANCE** — AUM growth story intact. Target: ₹8,000\n\n⚠️ *This is not financial advice. Always do your own research.*";
+  if (context && lowerMsg.includes("this")) {
+    return `Looking at **${context}**, the stock has shown strong momentum recently. Would you like me to pull up the technical indicators or recent news?`;
   }
 
-  if (msg.includes("it") || msg.includes("tech") || msg.includes("tcs") || msg.includes("infosys")) {
-    return "💻 **IT Sector Outlook:**\n\nThe Indian IT sector faces near-term pressure from:\n• Discretionary spending cuts in US/Europe\n• Macro uncertainty impacting deal closures\n• INR appreciation headwinds\n\n**TCS** (-0.78%) and **INFY** (+0.84%) have diverged. TCS missed Q3 estimates while Infosys is seeing a recovery in BFSI vertical.\n\nMedium-term outlook remains positive on AI/GenAI tailwinds.";
-  }
-
-  if (context) {
-    return `📌 Regarding **${context}**:\n\nBased on current market conditions, this stock shows moderate momentum. Key levels to watch:\n• Support: ₹${(Math.random() * 100 + 900).toFixed(2)}\n• Resistance: ₹${(Math.random() * 100 + 1100).toFixed(2)}\n\nVolume is above the 20-day average, suggesting institutional interest. Would you like a deeper technical analysis?`;
+  if (lowerMsg.includes("hi") || lowerMsg.includes("hello")) {
+    return "Hello! I'm Aria, your AI trading assistant. I can analyze stocks, summarize news, or review your portfolio. What can I help you with today?";
   }
 
   const responses = [

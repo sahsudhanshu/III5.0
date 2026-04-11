@@ -1,8 +1,9 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 "use client";
 import { useEffect, useState } from "react";
-import { useAuthStore } from "@/store/auth-store";
+import { useSession } from "next-auth/react";
 import {
-  MOCK_PORTFOLIO, MOCK_STOCKS, MOCK_NEWS, MOCK_TRANSACTIONS,
+  MOCK_PORTFOLIO, MOCK_NEWS, MOCK_TRANSACTIONS,
   generatePortfolioHistory, MOCK_SECTOR_ALLOCATION,
 } from "@/lib/mock-data";
 import { formatCurrency, formatPercent, cn, timeAgo } from "@/lib/utils";
@@ -17,20 +18,40 @@ import {
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip,
   ResponsiveContainer, PieChart, Pie, Cell,
 } from "recharts";
+import { useDataStore, INITIAL_UNIVERSE } from "@/store/data-store";
 
 const HISTORY = generatePortfolioHistory(90);
 
 export default function DashboardPage() {
-  const { user } = useAuthStore();
+  const { data: session } = useSession();
+  const user = session?.user;
   const router = useRouter();
+  
+  const { stocks, fetchStockProfile } = useDataStore();
   const [loading, setLoading] = useState(true);
   const [timeRange, setTimeRange] = useState("1M");
 
-  useEffect(() => { setTimeout(() => setLoading(false), 900); }, []);
+  useEffect(() => {
+    async function loadUniverse() {
+      setLoading(true);
+      for (const symbol of INITIAL_UNIVERSE) {
+        await fetchStockProfile(symbol);
+        await new Promise(r => setTimeout(r, 100)); // Rate limit safety
+      }
+      setLoading(false);
+    }
+    const missing = INITIAL_UNIVERSE.some(sym => !stocks[sym]);
+    if (missing) {
+      loadUniverse();
+    } else {
+      setTimeout(() => setLoading(false), 0);
+    }
+  }, [fetchStockProfile, stocks]);
 
   const p = MOCK_PORTFOLIO;
-  const gainers = MOCK_STOCKS.filter((s) => s.changePercent > 0).sort((a, b) => b.changePercent - a.changePercent).slice(0, 4);
-  const losers  = MOCK_STOCKS.filter((s) => s.changePercent < 0).sort((a, b) => a.changePercent - b.changePercent).slice(0, 4);
+  const availableStocks = INITIAL_UNIVERSE.map(s => stocks[s]).filter(Boolean);
+  const gainers = availableStocks.filter((s) => s.changePercent > 0).sort((a, b) => b.changePercent - a.changePercent).slice(0, 4);
+  const losers  = availableStocks.filter((s) => s.changePercent < 0).sort((a, b) => a.changePercent - b.changePercent).slice(0, 4);
 
   const chartData = {
     "1W": HISTORY.slice(-7),
@@ -43,7 +64,7 @@ export default function DashboardPage() {
   const firstName = user?.name?.split(" ")[0] ?? "Investor";
 
   return (
-    <div className="max-w-screen-xl mx-auto px-4 lg:px-6 py-6 space-y-6">
+    <div className="max-w-[1700px] mx-auto px-4 lg:px-6 py-6 space-y-6">
 
       {/* ── Welcome ── */}
       <div className="flex items-center justify-between">
@@ -130,8 +151,8 @@ export default function DashboardPage() {
                 <XAxis dataKey="date" tick={{ fontSize: 9 }} axisLine={false} tickLine={false}
                   tickFormatter={(v) => { const d = new Date(v); return `${d.getDate()}/${d.getMonth()+1}`; }}
                   interval="preserveStartEnd" />
-                <YAxis tickFormatter={(v) => `₹${(v/100000).toFixed(0)}L`} tick={{ fontSize: 9 }} axisLine={false} tickLine={false} width={45} />
-                <Tooltip formatter={(v: number) => [formatCurrency(v), "Value"]} contentStyle={{ background: "var(--card)", border: "1px solid var(--border)", borderRadius: "10px", fontSize: "11px" }} />
+                <YAxis tickFormatter={(v) => `$${(v/1000).toFixed(0)}k`} tick={{ fontSize: 9 }} axisLine={false} tickLine={false} width={45} />
+                <Tooltip formatter={(v: any) => [formatCurrency(v), "Value"]} contentStyle={{ background: "var(--card)", border: "1px solid var(--border)", borderRadius: "10px", fontSize: "11px" }} />
                 <Area type="monotone" dataKey="value" stroke="#00d09c" strokeWidth={2} fill="url(#pg)" dot={false} />
               </AreaChart>
             </ResponsiveContainer>

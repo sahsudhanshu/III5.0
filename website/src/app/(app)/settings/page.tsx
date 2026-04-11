@@ -1,12 +1,13 @@
 "use client";
-import { useAuthStore } from "@/store/auth-store";
+import { useSession } from "next-auth/react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useTheme } from "next-themes";
-import { Sun, Moon, User, Bell, Shield } from "lucide-react";
+import { Sun, Moon, User, Shield } from "lucide-react";
 
 export default function SettingsPage() {
-  const { user } = useAuthStore();
+  const { data: session } = useSession();
+  const user = session?.user;
   const { theme, setTheme } = useTheme();
 
   return (
@@ -25,11 +26,11 @@ export default function SettingsPage() {
         <div className="space-y-3">
           <div>
             <label className="text-xs font-medium text-muted-foreground">Full Name</label>
-            <Input className="mt-1.5 h-9" defaultValue={user?.name} />
+            <Input className="mt-1.5 h-9" defaultValue={user?.name || ""} />
           </div>
           <div>
             <label className="text-xs font-medium text-muted-foreground">Email</label>
-            <Input className="mt-1.5 h-9" defaultValue={user?.email} type="email" disabled />
+            <Input className="mt-1.5 h-9" defaultValue={user?.email || ""} type="email" disabled />
           </div>
         </div>
         <Button size="sm">Save Changes</Button>

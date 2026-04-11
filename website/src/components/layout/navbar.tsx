@@ -4,8 +4,8 @@ import { usePathname, useRouter } from "next/navigation";
 import { useState, useEffect, useRef } from "react";
 import { useTheme } from "next-themes";
 import { cn, formatCurrency, formatPercent } from "@/lib/utils";
-import { useAuthStore } from "@/store/auth-store";
-import { useWatchlistStore } from "@/store/watchlist-store";
+import { useSession, signOut } from "next-auth/react";
+import { useMarketStore } from "@/store/market-store";
 import { useChatStore } from "@/store/chat-store";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import {
@@ -17,10 +17,10 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { TICKER_STOCKS, MOCK_STOCKS } from "@/lib/mock-data";
+import { useDataStore, INITIAL_UNIVERSE } from "@/store/data-store";
 import {
   Search, Bell, Sun, Moon, Bot, TrendingUp, TrendingDown,
-  ChevronDown, X,
+  ChevronDown, X, Settings, LogOut, Loader2, Sparkles, User as UserIcon
 } from "lucide-react";
 
 // ── Primary nav items (Groww style) ──
@@ -67,7 +67,10 @@ function SearchBar() {
     return () => window.removeEventListener("keydown", handler);
   }, []);
 
-  const results = MOCK_STOCKS.filter(
+  const { stocks } = useDataStore();
+  const availableStocks = INITIAL_UNIVERSE.map(s => stocks[s]).filter(Boolean);
+
+  const results = availableStocks.filter(
     (s) =>
       s.symbol.toLowerCase().includes(query.toLowerCase()) ||
       s.name.toLowerCase().includes(query.toLowerCase())
@@ -150,14 +153,46 @@ function SearchBar() {
 
 // ── Market Ticker (compact) ──
 function MarketTicker() {
+  const { prices, subscribe, unsubscribe } = useMarketStore();
+
+  useEffect(() => {
+    // Subscribe to ticker stocks for live updates
+    const symbols = INITIAL_UNIVERSE.map(s => s === "BTC" ? "BINANCE:BTCUSDT" : s).slice(0, 5);
+    symbols.forEach(s => subscribe(s));
+    
+    return () => {
+      symbols.forEach(s => unsubscribe(s));
+    };
+  }, [subscribe, unsubscribe]);
+
+  const { stocks } = useDataStore();
+  
+  // Merge static with live prices
+  const displayStocks = INITIAL_UNIVERSE.slice(0, 5).map(symbol => {
+    const s = stocks[symbol];
+    if (!s) return null;
+    const finnhubSymbol = symbol === "BTC" ? "BINANCE:BTCUSDT" : symbol;
+    const live = prices[finnhubSymbol];
+    if (live) {
+      // Calculate derived change based on our static mock base if needed
+      const diff = live.price - s.price;
+      const isUp = diff >= 0;
+      return { ...s, currentPrice: live.price, isUp, live: true };
+    }
+    return { ...s, currentPrice: s.price, isUp: s.changePercent >= 0, live: false };
+  });
+
   return (
     <div className="hidden xl:flex items-center gap-4 overflow-hidden w-52 flex-shrink-0">
       <div className="flex items-center gap-4 animate-ticker w-max">
-        {[...TICKER_STOCKS.slice(0, 5), ...TICKER_STOCKS.slice(0, 5)].map((s, i) => (
+        {[...displayStocks, ...displayStocks].filter(Boolean).map((s, i) => (
           <span key={i} className="flex items-center gap-1.5 whitespace-nowrap">
-            <span className="text-[11px] font-semibold text-muted-foreground">{s.symbol}</span>
-            <span className={cn("text-[11px] font-bold num", s.changePercent >= 0 ? "text-bull" : "text-bear")}>
-              {s.changePercent >= 0 ? "+" : ""}{formatPercent(s.changePercent)}
+            <span className="text-[11px] font-semibold text-muted-foreground">{s!.symbol}</span>
+            <span className={cn("text-[11px] font-bold num transition-colors duration-300", 
+              s!.live && s!.isUp ? "text-bull" : s!.live && !s!.isUp ? "text-bear" : 
+              s!.changePercent >= 0 ? "text-bull" : "text-bear"
+            )}>
+              {s!.live ? formatCurrency(s!.currentPrice) : (s!.changePercent >= 0 ? "+" : "") + formatPercent(s!.changePercent)}
             </span>
           </span>
         ))}
@@ -171,15 +206,15 @@ export function Navbar() {
   const pathname = usePathname();
   const router = useRouter();
   const { theme, setTheme } = useTheme();
-  const { user, logout } = useAuthStore();
+  const { data: session } = useSession();
+  const user = session?.user;
   const { toggleChat } = useChatStore();
   const [mounted, setMounted] = useState(false);
 
-  useEffect(() => setMounted(true), []);
+  useEffect(() => { setTimeout(() => setMounted(true), 0); }, []);
 
-  const handleLogout = () => {
-    logout();
-    router.push("/auth/login");
+  const handleLogout = async () => {
+    await signOut({ callbackUrl: "/auth/login" });
   };
 
   return (

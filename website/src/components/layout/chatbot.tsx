@@ -4,7 +4,7 @@ import { cn } from "@/lib/utils";
 import { X, Bot, Send, Trash2, Minimize2, Maximize2, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useState, useRef, useEffect } from "react";
-import { motion, AnimatePresence } from "framer-motion";
+import { motion } from "framer-motion";
 
 function MessageContent({ content }: { content: string }) {
   // Simple markdown-like rendering
@@ -53,11 +53,9 @@ export function Chatbot() {
   const inputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
-    if (isOpen && !minimized) {
-      messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-      inputRef.current?.focus();
-    }
-  }, [messages, isOpen, minimized]);
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+    inputRef.current?.focus();
+  }, [messages]);
 
   const handleSend = async () => {
     if (!input.trim() || isTyping) return;
@@ -67,20 +65,10 @@ export function Chatbot() {
   };
 
   return (
-    <AnimatePresence>
-      {isOpen && (
-        <motion.div
-          initial={{ opacity: 0, y: 20, scale: 0.95 }}
-          animate={{ opacity: 1, y: 0, scale: 1 }}
-          exit={{ opacity: 0, y: 20, scale: 0.95 }}
-          transition={{ duration: 0.2, ease: "easeOut" }}
-          className={cn(
-            "fixed bottom-4 right-4 z-50 flex flex-col shadow-2xl rounded-2xl border border-border overflow-hidden",
-            minimized ? "w-64 h-12" : "w-80 h-[520px] sm:w-96"
-          )}
-          style={{ background: "var(--surface-elevated)" }}
-        >
-          {/* Header */}
+    <div
+      className="flex flex-col w-full h-full bg-card rounded-2xl border border-border overflow-hidden"
+    >
+      {/* Header */}
           <div className="flex items-center gap-2.5 px-4 py-3 border-b border-border bg-primary/5 flex-shrink-0">
             <div className="w-7 h-7 rounded-lg bg-primary flex items-center justify-center">
               <Bot className="w-4 h-4 text-primary-foreground" />
@@ -105,14 +93,7 @@ export function Chatbot() {
               >
                 <RefreshCw className="w-3 h-3" />
               </Button>
-              <Button
-                variant="ghost"
-                size="icon"
-                className="h-6 w-6"
-                onClick={() => setMinimized(!minimized)}
-              >
-                {minimized ? <Maximize2 className="w-3 h-3" /> : <Minimize2 className="w-3 h-3" />}
-              </Button>
+
               <Button
                 variant="ghost"
                 size="icon"
@@ -124,9 +105,7 @@ export function Chatbot() {
             </div>
           </div>
 
-          {!minimized && (
-            <>
-              {/* Messages */}
+
               <div className="flex-1 overflow-y-auto p-3 space-y-3">
                 {messages.map((msg) => (
                   <motion.div
@@ -222,10 +201,6 @@ export function Chatbot() {
                   </button>
                 </div>
               </div>
-            </>
-          )}
-        </motion.div>
-      )}
-    </AnimatePresence>
+      </div>
   );
 }

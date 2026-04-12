@@ -21,6 +21,60 @@ function correlationWidth(absAvg: number): number {
   return Math.max(1, Math.round(absAvg * 8));
 }
 
+// ── Types ──────────────────────────────────────────────────────────────────
+interface GraphNodeData {
+  _type: 'node';
+  id: string;
+  ticker?: string;
+  name?: string;
+  label?: string;
+  current_price?: number;
+  momentum?: number;
+  sentiment?: string;
+  sma_50?: number;
+  sma_200?: number;
+  macd?: number;
+  rsi?: number;
+  volatility?: number;
+  source?: string;
+  title?: string;
+  snippet?: string;
+  sector?: string;
+  industry?: string;
+  [key: string]: unknown;
+}
+
+interface GraphEdgeData {
+  _type: 'edge';
+  source: string;
+  target: string;
+  label: string;
+  pearson?: number;
+  abs_avg?: number;
+  spearman?: number;
+  strength?: string;
+  direction?: string;
+  pearson_formatted?: string;
+  [key: string]: unknown;
+}
+
+type GraphElementData = GraphNodeData | GraphEdgeData;
+
+interface AgentVisualEdge {
+  source: string;
+  target: string;
+  color: string;
+  width: number;
+}
+
+interface GraphAgentResponse {
+  response: string;
+  thought?: string;
+  tickers: string[];
+  related: string[];
+  edges: AgentVisualEdge[];
+}
+
 export default function SmartGraph() {
   const { requireAuth } = useRequireAuth();
   const [elements, setElements] = useState([]);
@@ -29,10 +83,9 @@ export default function SmartGraph() {
   const [isBuilding, setIsBuilding] = useState(false);
   const [inputTickers, setInputTickers] = useState('');
   const [filter, setFilter] = useState('All');
-  const [hoverData, setHoverData] = useState<any | null>(null);
-  const [selectedNodeData, setSelectedNodeData] = useState<any | null>(null);
-  const [selectedEdgeData, setSelectedEdgeData] = useState<any | null>(null);
-  const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
+  const [hoverData, setHoverData] = useState<GraphElementData | null>(null);
+  const [selectedNodeData, setSelectedNodeData] = useState<GraphNodeData | null>(null);
+  const [selectedEdgeData, setSelectedEdgeData] = useState<GraphEdgeData | null>(null);
   const cyRef = useRef<cytoscape.Core | null>(null);
 
   // ── Chat state ───────────────────────────────────────────────────────────
@@ -41,6 +94,54 @@ export default function SmartGraph() {
   const [chatMessages, setChatMessages] = useState<Array<{ role: 'user' | 'assistant'; content: string }>>([]);
   const [chatLoading, setChatLoading] = useState(false);
   const chatEndRef = useRef<HTMLDivElement>(null);
+
+  /** ── Apply AI-driven visuals (zoom & highlight) ─────────────────── */
+  const applyGraphVisuals = useCallback((data: GraphAgentResponse) => {
+    if (!cyRef.current) return;
+    const cy = cyRef.current;
+
+    // 1. Reset
+    cy.elements().removeClass('dimmed agent-highlight agent-highlight-related agent-highlight-edge');
+    cy.elements().removeStyle();
+
+    // 2. Identify target elements
+    const primaryNodes = cy.nodes().filter(n => data.tickers.includes(n.data('ticker') || ''));
+    const relatedNodes = cy.nodes().filter(n => data.related.includes(n.data('ticker') || ''));
+    
+    // 3. Highlight nodes
+    primaryNodes.addClass('agent-highlight');
+    relatedNodes.addClass('agent-highlight-related');
+
+    // 4. Highlight specific edges
+    data.edges.forEach(e => {
+      const edge = cy.edges().filter(ele => 
+        (ele.data('source') === e.source && ele.data('target') === e.target) ||
+        (ele.data('source') === e.target && ele.data('target') === e.source)
+      );
+      edge.addClass('agent-highlight-edge');
+      edge.style({
+        'line-color': e.color,
+        'width': e.width,
+        'target-arrow-color': e.color,
+      });
+    });
+
+    // 5. Dim the rest
+    const relevantElements = primaryNodes.union(relatedNodes).union(cy.elements('.agent-highlight-edge')).neighborhood().union(primaryNodes).union(relatedNodes);
+    cy.elements().difference(relevantElements).addClass('dimmed');
+
+    // 6. Zoom/Animate
+    if (primaryNodes.length > 0) {
+      cy.animate({
+        fit: {
+          eles: primaryNodes.union(relatedNodes),
+          padding: 150
+        },
+        duration: 800,
+        easing: 'ease-in-out'
+      });
+    }
+  }, []);
 
   // Auto-scroll chat
   useEffect(() => {
@@ -64,12 +165,20 @@ export default function SmartGraph() {
           selected_ticker: selectedNodeData?.ticker || null,
         }),
       });
-      const data = await res.json();
+      const data: GraphAgentResponse = await res.json();
+      
       setChatMessages(prev => [
         ...prev,
         { role: 'assistant', content: data.response || 'No response.' },
       ]);
-    } catch {
+
+      // Trigger graph visuals if there's metadata
+      if (data.tickers?.length || data.related?.length || data.edges?.length) {
+        applyGraphVisuals(data);
+      }
+
+    } catch (err) {
+      console.error('Chat error:', err);
       setChatMessages(prev => [
         ...prev,
         { role: 'assistant', content: '⚠️ Could not reach the AI service. Is the backend running?' },
@@ -77,7 +186,7 @@ export default function SmartGraph() {
     } finally {
       setChatLoading(false);
     }
-  }, [chatInput, chatLoading, chatMessages, selectedNodeData]);
+  }, [chatInput, chatLoading, chatMessages, selectedNodeData, applyGraphVisuals]);
 
   // ── Fetch graph ───────────────────────────────────────────────────────────
   const fetchGraphData = useCallback(() => {
@@ -151,7 +260,7 @@ export default function SmartGraph() {
   };
 
   // ── Stylesheet ────────────────────────────────────────────────────────────
-  const style: cytoscape.Stylesheet[] = [
+  const style: cytoscape.StylesheetStyle[] = [
     // Company nodes — blue circles
     {
       selector: 'node[label = "Company"]',
@@ -278,8 +387,30 @@ export default function SmartGraph() {
         'font-size': '8px',
         'text-background-color': '#f8fafc',
         'text-background-opacity': 0.8,
-        'text-background-padding': '2px' as any,
-      },
+        'text-background-padding': '2px',
+      } as cytoscape.Css.Edge,
+    },
+    // Agent Highlights
+    {
+      selector: '.agent-highlight',
+      style: {
+        'width': 60,
+        'height': 60,
+        'border-width': 4,
+        'border-color': '#3b82f6',
+        'z-index': 999
+      } as cytoscape.Css.Node,
+    },
+    {
+      selector: '.agent-highlight-related',
+      style: {
+        'width': 50,
+        'height': 50,
+        'border-width': 3,
+        'border-color': '#60a5fa',
+        'border-style': 'dashed',
+        'z-index': 998
+      } as cytoscape.Css.Node,
     },
     // Dimmed state
     {
@@ -290,18 +421,18 @@ export default function SmartGraph() {
     {
       selector: 'node',
       style: {
-        'transition-property': 'opacity, width, height',
+        'transition-property': 'opacity, width, height, border-color, border-width',
         'transition-duration': 300,
         'transition-timing-function': 'ease-in-out',
-      } as any,
+      } as cytoscape.Css.Node, 
     },
     {
       selector: 'edge',
       style: {
-        'transition-property': 'opacity, width',
+        'transition-property': 'opacity, width, line-color',
         'transition-duration': 300,
         'transition-timing-function': 'ease-in-out',
-      } as any,
+      } as cytoscape.Css.Edge,
     },
   ];
 
@@ -318,12 +449,14 @@ export default function SmartGraph() {
   const activeData = selectedEdgeData || selectedNodeData || hoverData;
 
   const handleSimulate = () => {
+    if (!activeData) return;
     requireAuth(() => {
       window.location.href = `/explore/${activeData.ticker}`;
     }, 'Sign in to run Buy/Sell simulations.');
   };
 
   const handleInsights = () => {
+    if (!activeData) return;
     requireAuth(() => {
       alert(`Activating AI Agent for deep insight on ${activeData.ticker}`);
     }, 'Sign in to access advanced AI Insights.');
@@ -368,16 +501,15 @@ export default function SmartGraph() {
             value={filter}
             onChange={e => {
               setFilter(e.target.value);
-              setSelectedNodeId(null);
               setSelectedNodeData(null);
               setSelectedEdgeData(null);
               if (cyRef.current) {
                 const cy = cyRef.current;
-                cy.elements().removeClass('dimmed').show();
+                cy.elements().removeClass('dimmed').style('display', 'element');
                 if (e.target.value === 'PositiveNews') {
-                  cy.nodes('[label="News"][sentiment!="Positive"]').hide();
+                  cy.nodes('[label="News"][sentiment!="Positive"]').style('display', 'none');
                 } else if (e.target.value === 'BullishCompanies') {
-                  cy.nodes('[label="Company"]').filter(ele => ele.data('sma_50') <= ele.data('sma_200')).hide();
+                  cy.nodes('[label="Company"]').filter(ele => (ele.data('sma_50') as number) <= (ele.data('sma_200') as number)).style('display', 'none');
                 } else if (e.target.value === 'CorrelationsOnly') {
                   // Hide all non-company nodes and non-correlation edges
                   cy.nodes('[label != "Company"]').addClass('dimmed');
@@ -419,24 +551,24 @@ export default function SmartGraph() {
               <div className="grid grid-cols-2 gap-2 text-sm">
                 <div className="bg-slate-100 dark:bg-slate-800 p-2 rounded">
                   <span className="text-slate-500 block text-xs">Pearson</span>
-                  <span className={`font-bold ${activeData.pearson >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                    {activeData.pearson}
+                  <span className={`font-bold ${(activeData.pearson ?? 0) >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                    {activeData.pearson ?? 'N/A'}
                   </span>
                 </div>
                 <div className="bg-slate-100 dark:bg-slate-800 p-2 rounded">
                   <span className="text-slate-500 block text-xs">Spearman</span>
-                  <span className={`font-bold ${activeData.spearman >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                    {activeData.spearman}
+                  <span className={`font-bold ${(activeData.spearman ?? 0) >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                    {activeData.spearman ?? 'N/A'}
                   </span>
                 </div>
                 <div className="bg-slate-100 dark:bg-slate-800 p-2 rounded">
                   <span className="text-slate-500 block text-xs">Strength</span>
-                  <span className="font-semibold">{activeData.strength}</span>
+                  <span className="font-semibold">{activeData.strength ?? 'N/A'}</span>
                 </div>
                 <div className="bg-slate-100 dark:bg-slate-800 p-2 rounded">
                   <span className="text-slate-500 block text-xs">Direction</span>
-                  <span className={`font-semibold capitalize ${activeData.direction === 'positive' ? 'text-green-600' : 'text-red-600'}`}>
-                    {activeData.direction}
+                  <span className={`font-semibold capitalize ${(activeData.direction ?? '').toLowerCase() === 'positive' ? 'text-green-600' : 'text-red-600'}`}>
+                    {activeData.direction ?? 'N/A'}
                   </span>
                 </div>
               </div>
@@ -444,7 +576,7 @@ export default function SmartGraph() {
           )}
 
           {/* ── Company detail ─── */}
-          {activeData.label === 'Company' && (
+          {activeData._type === 'node' && activeData.label === 'Company' && (
             <div>
               <div className="flex justify-between items-start">
                 <h3 className="text-xl font-bold mb-1">{activeData.name} ({activeData.ticker})</h3>
@@ -455,31 +587,31 @@ export default function SmartGraph() {
               <div className="grid grid-cols-2 gap-2 text-sm mt-3">
                 <div className="bg-slate-100 dark:bg-slate-800 p-2 rounded transition-colors hover:bg-slate-200 dark:hover:bg-slate-700">
                   <span className="text-slate-500 block text-xs">Price</span>
-                  <span className="font-semibold">${activeData.current_price?.toFixed(2)}</span>
+                  <span className="font-semibold">${activeData.current_price?.toFixed(2) ?? '0.00'}</span>
                 </div>
                 <div className="bg-slate-100 dark:bg-slate-800 p-2 rounded transition-colors hover:bg-slate-200 dark:hover:bg-slate-700">
                   <span className="text-slate-500 block text-xs">Momentum</span>
-                  <span className={`font-semibold ${activeData.momentum > 0 ? 'text-green-500' : 'text-red-500'}`}>
-                    {activeData.momentum > 0 ? '+' : ''}{activeData.momentum}%
+                  <span className={`font-semibold ${(activeData.momentum ?? 0) > 0 ? 'text-green-500' : 'text-red-500'}`}>
+                    {(activeData.momentum ?? 0) > 0 ? '+' : ''}{activeData.momentum ?? 0}%
                   </span>
                 </div>
                 <div className="bg-slate-100 dark:bg-slate-800 p-2 rounded transition-colors hover:bg-slate-200 dark:hover:bg-slate-700">
                   <span className="text-slate-500 block text-xs">SMA 50 / 200</span>
-                  <span className="font-semibold text-xs">{activeData.sma_50} / {activeData.sma_200}</span>
+                  <span className="font-semibold text-xs">{activeData.sma_50 ?? 0} / {activeData.sma_200 ?? 0}</span>
                 </div>
                 <div className="bg-slate-100 dark:bg-slate-800 p-2 rounded transition-colors hover:bg-slate-200 dark:hover:bg-slate-700">
                   <span className="text-slate-500 block text-xs">MACD</span>
-                  <span className="font-semibold text-xs">{activeData.macd}</span>
+                  <span className="font-semibold text-xs">{activeData.macd ?? 0}</span>
                 </div>
                 <div className="bg-slate-100 dark:bg-slate-800 p-2 rounded transition-colors hover:bg-slate-200 dark:hover:bg-slate-700">
                   <span className="text-slate-500 block text-xs">RSI</span>
-                  <span className={`font-semibold text-xs ${activeData.rsi > 70 ? 'text-red-500' : activeData.rsi < 30 ? 'text-green-500' : ''}`}>
-                    {activeData.rsi}
+                  <span className={`font-semibold text-xs ${(activeData.rsi ?? 50) > 70 ? 'text-red-500' : (activeData.rsi ?? 50) < 30 ? 'text-green-500' : ''}`}>
+                    {activeData.rsi ?? 0}
                   </span>
                 </div>
                 <div className="bg-slate-100 dark:bg-slate-800 p-2 rounded transition-colors hover:bg-slate-200 dark:hover:bg-slate-700">
                   <span className="text-slate-500 block text-xs">Volatility</span>
-                  <span className="font-semibold text-xs">{activeData.volatility}</span>
+                  <span className="font-semibold text-xs">{activeData.volatility ?? 0}</span>
                 </div>
               </div>
 
@@ -505,7 +637,7 @@ export default function SmartGraph() {
           )}
 
           {/* ── News detail ─── */}
-          {activeData.label === 'News' && (
+          {activeData._type === 'node' && activeData.label === 'News' && (
             <div>
               <div className="flex justify-between items-start mb-2">
                 <h3 className="text-md font-bold">{activeData.source}</h3>
@@ -519,7 +651,7 @@ export default function SmartGraph() {
           )}
 
           {/* ── Product detail ─── */}
-          {activeData.label === 'Product' && (
+          {activeData._type === 'node' && activeData.label === 'Product' && (
             <div>
               <h3 className="text-lg font-bold">{activeData.name}</h3>
               <p className="text-sm text-slate-500">{activeData.sector} • {activeData.industry}</p>
@@ -566,19 +698,17 @@ export default function SmartGraph() {
             if (edgeLabel === 'CORRELATED_WITH') {
               setSelectedEdgeData({ ...edge.data(), _type: 'edge' });
               setSelectedNodeData(null);
-              setSelectedNodeId(null);
             }
           });
 
           // ── Node click ────────────────────────────────────────────────
           cy.on('tap', 'node', event => {
             const node = event.target;
-            setSelectedNodeId(node.id());
-            setSelectedNodeData(node.data());
+            setSelectedNodeData(node.data() as GraphNodeData);
             setSelectedEdgeData(null);
 
             // Expand node relations visually
-            cy.elements().removeClass('dimmed').show();
+            cy.elements().removeClass('dimmed').style('display', 'element');
             const neighbors = node.neighborhood();
             const family = node.union(neighbors);
             cy.elements().difference(family).addClass('dimmed');
@@ -591,14 +721,13 @@ export default function SmartGraph() {
           // ── Background click — reset ──────────────────────────────────
           cy.on('tap', event => {
             if (event.target === cy) {
-              setSelectedNodeId(null);
               setSelectedNodeData(null);
               setSelectedEdgeData(null);
-              cy.elements().removeClass('dimmed').show();
+              cy.elements().removeClass('dimmed').style('display', 'element');
               if (filter === 'PositiveNews') {
-                cy.nodes('[label="News"][sentiment!="Positive"]').hide();
+                cy.nodes('[label="News"][sentiment!="Positive"]').style('display', 'none');
               } else if (filter === 'BullishCompanies') {
-                cy.nodes('[label="Company"]').filter(ele => ele.data('sma_50') <= ele.data('sma_200')).hide();
+                cy.nodes('[label="Company"]').filter(ele => (ele.data('sma_50') as number) <= (ele.data('sma_200') as number)).style('display', 'none');
               } else if (filter === 'CorrelationsOnly') {
                 cy.nodes('[label != "Company"]').addClass('dimmed');
                 cy.edges('[label != "CORRELATED_WITH"]').addClass('dimmed');

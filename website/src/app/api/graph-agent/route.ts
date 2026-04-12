@@ -23,7 +23,7 @@ export async function POST(request: NextRequest) {
 
     const data = await res.json();
     return NextResponse.json(data);
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Graph chat proxy error:', error);
     return NextResponse.json(
       { response: '⚠️ Graph AI service is offline. Make sure the backend is running on port 8001.' },

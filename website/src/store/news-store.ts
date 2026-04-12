@@ -33,31 +33,33 @@ interface NewsState {
 function normalizeApiArticles(input: unknown): NewsArticle[] {
   if (!Array.isArray(input)) return [];
 
-  return input
-    .map((item) => {
-      const source = typeof item === "object" && item !== null ? item as Record<string, unknown> : null;
-      if (!source) return null;
+  const articles: NewsArticle[] = [];
 
-      const title = typeof source.title === "string" ? source.title : "";
-      const summary = typeof source.summary === "string" ? source.summary : "";
-      const sourceName = typeof source.source === "string" ? source.source : "Market Desk";
-      const url = typeof source.url === "string" ? source.url : "#";
-      const sentiment =
-        source.sentiment === "positive" || source.sentiment === "negative" || source.sentiment === "neutral"
-          ? source.sentiment
-          : undefined;
+  for (const item of input) {
+    const source = typeof item === "object" && item !== null ? item as Record<string, unknown> : null;
+    if (!source) continue;
 
-      const published =
-        typeof source.published === "string"
-          ? source.published
-          : typeof source.publishedAt === "string"
-            ? source.publishedAt
-            : new Date().toISOString();
+    const title = typeof source.title === "string" ? source.title : "";
+    const summary = typeof source.summary === "string" ? source.summary : "";
+    const sourceName = typeof source.source === "string" ? source.source : "Market Desk";
+    const url = typeof source.url === "string" ? source.url : "#";
+    const sentiment =
+      source.sentiment === "positive" || source.sentiment === "negative" || source.sentiment === "neutral"
+        ? source.sentiment
+        : undefined;
 
-      if (!title) return null;
-      return { title, summary, source: sourceName, url, published, feedType: "live", sentiment } satisfies NewsArticle;
-    })
-    .filter((a): a is NewsArticle => Boolean(a));
+    const published =
+      typeof source.published === "string"
+        ? source.published
+        : typeof source.publishedAt === "string"
+          ? source.publishedAt
+          : new Date().toISOString();
+
+    if (!title) continue;
+    articles.push({ title, summary, source: sourceName, url, published, feedType: "live", sentiment });
+  }
+
+  return articles;
 }
 
 function fallbackNews(query: string, limit: number): NewsArticle[] {

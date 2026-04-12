@@ -1,13 +1,13 @@
 "use client";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { useState } from "react";
+import { useState, Suspense } from "react";
 import { signIn } from "next-auth/react";
 import { Eye, EyeOff, Activity } from "lucide-react";
 import { toast } from "sonner";
 import { motion } from "framer-motion";
 
-export default function LoginPage() {
+function LoginContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const rawCallback = searchParams.get("callbackUrl") || "/dashboard";
@@ -109,7 +109,7 @@ export default function LoginPage() {
               />
               <button 
                 type="button" 
-                className="absolute right-0 top-0 h-12 w-12 flex items-center justify-center text-white/40 hover:text-white transition-colors" 
+                className="absolute right-0 h-12 w-12 flex items-center justify-center text-white/40 hover:text-white transition-colors" 
                 onClick={() => setShowPassword(!showPassword)}
               >
                 {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
@@ -178,5 +178,17 @@ export default function LoginPage() {
         }
       `}} />
     </div>
+  );
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen bg-[#050914] flex items-center justify-center">
+        <div className="w-10 h-10 border-4 border-primary border-t-transparent rounded-full animate-spin" />
+      </div>
+    }>
+      <LoginContent />
+    </Suspense>
   );
 }

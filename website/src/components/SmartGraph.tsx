@@ -497,7 +497,7 @@ export default function SmartGraph() {
         {/* Filter */}
         <div className="flex bg-card/80 p-2 rounded-lg backdrop-blur-sm shadow-sm border border-border">
           <select
-            className="w-full p-1 text-sm border border-border rounded bg-transparent focus:outline-none focus:ring-2 focus:ring-primary/20"
+            className="w-full p-1 text-sm border border-border rounded bg-card text-foreground focus:outline-none focus:ring-2 focus:ring-primary/20"
             value={filter}
             onChange={e => {
               setFilter(e.target.value);
@@ -518,10 +518,10 @@ export default function SmartGraph() {
               }
             }}
           >
-            <option value="All">All Connections</option>
-            <option value="CorrelationsOnly">Correlations Only</option>
-            <option value="PositiveNews">Positive News Only</option>
-            <option value="BullishCompanies">Bullish Companies (SMA 50 &gt; 200)</option>
+            <option className="bg-card text-foreground" value="All">All Connections</option>
+            <option className="bg-card text-foreground" value="CorrelationsOnly">Correlations Only</option>
+            <option className="bg-card text-foreground" value="PositiveNews">Positive News Only</option>
+            <option className="bg-card text-foreground" value="BullishCompanies">Bullish Companies (SMA 50 &gt; 200)</option>
           </select>
         </div>
       </div>

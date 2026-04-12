@@ -6,6 +6,7 @@ import { useChatStore } from "@/store/chat-store";
 import { Chatbot } from "@/components/layout/chatbot";
 import { AuthModal } from "@/components/auth/auth-modal";
 import { AnimatePresence, motion } from "framer-motion";
+import { cn } from "@/lib/utils";
 
 interface AppShellProps {
   children: React.ReactNode;
@@ -34,7 +35,12 @@ export function AppShell({ children }: AppShellProps) {
         {/* Page content */}
         <main className="flex-1 w-full flex overflow-hidden relative z-0">
           <motion.div layout className="flex-1 min-w-0 overflow-y-auto">
-            <div className="animate-fade-in-up min-h-full">
+            <div
+              className={cn(
+                "animate-fade-in-up min-h-full transition-[padding] duration-300",
+                isOpen ? "px-0" : "px-12 lg:px-13"
+              )}
+            >
               {children}
             </div>
           </motion.div>

@@ -4,6 +4,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { useMarketStore } from "@/store/market-store";
 import { useChatStore } from "@/store/chat-store";
 import { Chatbot } from "@/components/layout/chatbot";
+import { AuthModal } from "@/components/auth/auth-modal";
 import { AnimatePresence, motion } from "framer-motion";
 
 interface AppShellProps {
@@ -56,6 +57,7 @@ export function AppShell({ children }: AppShellProps) {
           </AnimatePresence>
         </main>
       </div>
+      <AuthModal />
     </TooltipProvider>
   );
 }

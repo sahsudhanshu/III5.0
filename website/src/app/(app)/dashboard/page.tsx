@@ -2,9 +2,7 @@
 "use client";
 import { useEffect, useMemo, useState } from "react";
 import { useSession } from "next-auth/react";
-import {
-  MOCK_NEWS,
-} from "@/lib/mock-data";
+
 import { formatCurrency, formatPercent, cn, timeAgo } from "@/lib/utils";
 import {
   TrendingUp, TrendingDown, ArrowUpRight, ArrowDownRight,
@@ -19,16 +17,27 @@ import {
 } from "recharts";
 import { useDataStore, INITIAL_UNIVERSE } from "@/store/data-store";
 import { usePortfolioStore } from "@/store/portfolio-store";
+import { useNews } from "@/store/news-store";
+import { useChatContext } from "@/store/chat-store";
+import { useRequireAuth } from "@/hooks/use-require-auth";
 
 export default function DashboardPage() {
   const { data: session } = useSession();
   const user = session?.user;
+  const { isAuthenticated, requireAuth } = useRequireAuth();
   const router = useRouter();
   
   const { stocks, fetchStockProfile } = useDataStore();
   const { portfolio, fetchPortfolio } = usePortfolioStore();
   const [loading, setLoading] = useState(true);
   const [timeRange, setTimeRange] = useState("1M");
+
+  // Live news via Zustand store
+  const { articles: marketNews, loading: loadingNews } = useNews("market", 4);
+
+
+  // (dashboardContext and useChatContext declared after computed values below)
+
 
   useEffect(() => {
     fetchPortfolio();
@@ -129,6 +138,37 @@ export default function DashboardPage() {
   const gainers = availableStocks.filter((s) => s.changePercent > 0).sort((a, b) => b.changePercent - a.changePercent).slice(0, 4);
   const losers  = availableStocks.filter((s) => s.changePercent < 0).sort((a, b) => a.changePercent - b.changePercent).slice(0, 4);
 
+  // Rich context for Aria — built after all computed values are ready
+  const dashboardContext = useMemo(() => {
+    const lines: string[] = [];
+    lines.push("PAGE: Portfolio Dashboard");
+    lines.push(`User: ${user?.name ?? "Investor"}`);
+    lines.push(`\nPORTFOLIO SUMMARY:`);
+    lines.push(`  Total Value   : $${totalValue.toFixed(2)}`);
+    lines.push(`  Cash Balance  : $${cash.toFixed(2)}`);
+    lines.push(`  Invested      : $${totalInvested.toFixed(2)}`);
+    lines.push(`  Overall P&L   : ${totalPnL >= 0 ? "+" : ""}$${totalPnL.toFixed(2)} (${totalPnLPercent.toFixed(2)}%)`);
+    lines.push(`  Today's P&L   : ${dayPnL >= 0 ? "+" : ""}$${dayPnL.toFixed(2)} (${dayPnLPercent.toFixed(2)}%)`);
+    if (holdings.length > 0) {
+      lines.push(`\nHOLDINGS (${holdings.length} positions):`);
+      holdings.forEach(h => lines.push(`  ${h.symbol}: ${h.qty} shares @ avg $${h.avgBuyPrice.toFixed(2)} | Now $${h.livePrice.toFixed(2)} | P&L ${h.pnl >= 0 ? "+" : ""}$${h.pnl.toFixed(2)} (${h.pnlPercent.toFixed(1)}%)`));
+    } else {
+      lines.push(`\nHOLDINGS: No positions yet.`);
+    }
+    if (sectorAllocation.length > 0) {
+      lines.push(`\nSECTOR ALLOCATION:`);
+      sectorAllocation.forEach(s => lines.push(`  ${s.sector}: ${s.percentage.toFixed(1)}%`));
+    }
+    if (gainers.length > 0) lines.push(`\nTOP GAINERS: ${gainers.map(s => `${s.symbol} +${s.changePercent.toFixed(2)}%`).join(", ")}`);
+    if (losers.length > 0) lines.push(`TOP LOSERS:  ${losers.map(s => `${s.symbol} ${s.changePercent.toFixed(2)}%`).join(", ")}`);
+    if (recentOrders.length > 0) {
+      lines.push(`\nRECENT TRANSACTIONS:`);
+      recentOrders.slice(0, 3).forEach(t => lines.push(`  ${t.type} ${t.qty} ${t.symbol} @ $${t.price?.toFixed(2)} on ${new Date(t.timestamp).toLocaleDateString()}`));
+    }
+    return lines.join("\n");
+  }, [user, totalValue, cash, totalInvested, totalPnL, totalPnLPercent, dayPnL, dayPnLPercent, holdings, sectorAllocation, gainers, losers, recentOrders]);
+  useChatContext(dashboardContext);
+
   const chartData = {
     "1W": history.slice(-7),
     "1M": history.slice(-30),
@@ -154,8 +194,15 @@ export default function DashboardPage() {
       </div>
 
       {/* ── Portfolio Hero Card ── */}
-      <div className="groww-card p-5">
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+      <div className="groww-card p-5 relative overflow-hidden">
+        {!isAuthenticated && (
+          <div className="absolute inset-0 z-10 bg-background/80 backdrop-blur-sm flex flex-col items-center justify-center text-center p-6">
+            <h3 className="font-bold mb-2">Portfolio Overview</h3>
+            <p className="text-sm text-muted-foreground mb-4 max-w-[300px]">Sign in to track your investments and live performance.</p>
+            <button onClick={() => requireAuth(() => {})} className="btn-groww text-xs px-6 py-2 shadow-[0_0_15px_rgba(0,208,156,0.3)]">Authenticate</button>
+          </div>
+        )}
+        <div className={cn("grid grid-cols-1 md:grid-cols-2 gap-6", !isAuthenticated && "opacity-20 pointer-events-none select-none blur-sm")}>
           {/* Left: total value */}
           <div className="space-y-4">
             <div>
@@ -240,14 +287,19 @@ export default function DashboardPage() {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
 
         {/* Holdings */}
-        <div className="groww-card p-4">
+        <div className="groww-card p-4 relative overflow-hidden">
+          {!isAuthenticated && (
+            <div className="absolute inset-0 z-10 bg-background/80 backdrop-blur-sm flex flex-col items-center justify-center p-4">
+               <button onClick={() => requireAuth(() => {})} className="px-4 py-2 bg-primary/20 text-primary font-bold text-xs rounded-xl mt-4">Sign in to view</button>
+            </div>
+          )}
           <div className="flex items-center justify-between mb-3">
             <p className="text-sm font-bold">Your Holdings</p>
-            <button onClick={() => router.push("/portfolio")} className="text-primary text-xs font-semibold flex items-center gap-0.5 hover:underline">
+            <button onClick={() => router.push("/portfolio")} className="text-primary text-xs font-semibold flex items-center gap-0.5 hover:underline" disabled={!isAuthenticated}>
               View all <ChevronRight className="w-3 h-3" />
             </button>
           </div>
-          <div className="space-y-0.5">
+          <div className={cn("space-y-0.5", !isAuthenticated && "opacity-20 blur-[2px]")}>
             {holdings.slice(0, 5).map((h) => (
               <div
                 key={h.symbol}
@@ -347,14 +399,19 @@ export default function DashboardPage() {
       {/* ── Recent Transactions + News ── */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
         {/* Transactions */}
-        <div className="groww-card p-4">
+        <div className="groww-card p-4 relative overflow-hidden">
+          {!isAuthenticated && (
+            <div className="absolute inset-0 z-10 bg-background/80 backdrop-blur-sm flex flex-col items-center justify-center p-4">
+               <button onClick={() => requireAuth(() => {})} className="px-4 py-2 bg-primary/20 text-primary font-bold text-xs rounded-xl mt-4">Sign in to view</button>
+            </div>
+          )}
           <div className="flex items-center justify-between mb-3">
             <p className="text-sm font-bold">Recent Orders</p>
-            <button onClick={() => router.push("/transactions")} className="text-primary text-xs font-semibold flex items-center gap-0.5 hover:underline">
+            <button onClick={() => router.push("/transactions")} className="text-primary text-xs font-semibold flex items-center gap-0.5 hover:underline" disabled={!isAuthenticated}>
               All orders <ChevronRight className="w-3 h-3" />
             </button>
           </div>
-          <div className="space-y-2">
+          <div className={cn("space-y-2", !isAuthenticated && "opacity-20 blur-[2px]")}>
             {recentOrders.map((t) => (
               <div key={t.id} className="flex items-center gap-3 py-2 px-2 rounded-lg hover:bg-muted/50 transition-colors">
                 <div className={cn("w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0", t.type === "BUY" ? "bg-bull-muted" : "bg-bear-muted")}>
@@ -395,19 +452,39 @@ export default function DashboardPage() {
             </button>
           </div>
           <div className="space-y-3">
-            {MOCK_NEWS.slice(0, 4).map((article) => (
-              <div key={article.id} className="pb-3 border-b border-border last:border-0 last:pb-0 cursor-pointer group">
-                <div className="flex items-center gap-2 mb-1">
-                  <Badge variant="secondary" className={cn("text-[9px]", article.sentiment === "positive" ? "bg-bull-muted text-bull" : article.sentiment === "negative" ? "bg-bear-muted text-bear" : "bg-muted text-muted-foreground")}>
-                    {article.sentiment}
-                  </Badge>
-                  <span className="text-[10px] text-muted-foreground">{article.source}</span>
-                </div>
-                <p className="text-xs font-semibold text-foreground leading-relaxed line-clamp-2 group-hover:text-primary transition-colors">
-                  {article.title}
-                </p>
+            {loadingNews ? (
+              <div className="space-y-4">
+                {[1, 2, 3, 4].map(i => (
+                  <div key={i} className="animate-pulse">
+                    <div className="h-3 w-1/4 bg-muted rounded mb-2"></div>
+                    <div className="h-4 w-full bg-muted rounded"></div>
+                  </div>
+                ))}
               </div>
-            ))}
+            ) : marketNews.length > 0 ? (
+              marketNews.map((article, idx) => {
+                const isPositive = article.title.toLowerCase().includes("beat") || article.title.toLowerCase().includes("jump") || article.title.toLowerCase().includes("rally");
+                const isNegative = article.title.toLowerCase().includes("fall") || article.title.toLowerCase().includes("drop") || article.title.toLowerCase().includes("decline");
+                const sentiment = isPositive ? "positive" : isNegative ? "negative" : "neutral";
+                
+                return (
+                  <div key={idx} className="pb-3 border-b border-border last:border-0 last:pb-0 cursor-pointer group" onClick={() => article.url ? window.open(article.url, "_blank") : null}>
+                    <div className="flex items-center gap-2 mb-1">
+                      <Badge variant="secondary" className={cn("text-[9px]", sentiment === "positive" ? "bg-bull-muted text-bull" : sentiment === "negative" ? "bg-bear-muted text-bear" : "bg-muted text-muted-foreground")}>
+                        {sentiment}
+                      </Badge>
+                      <span className="text-[10px] text-muted-foreground">{article.source}</span>
+                      {article.published && <span className="text-[9px] text-muted-foreground/70 ml-auto">{article.published}</span>}
+                    </div>
+                    <p className="text-xs font-semibold text-foreground leading-relaxed line-clamp-2 group-hover:text-primary transition-colors">
+                      {article.title}
+                    </p>
+                  </div>
+                );
+              })
+            ) : (
+              <p className="text-xs text-muted-foreground">No recent news found.</p>
+            )}
           </div>
         </div>
       </div>

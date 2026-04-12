@@ -3,6 +3,7 @@
 import { useEffect, useState, useCallback } from "react";
 import { usePortfolioStore } from "@/store/portfolio-store";
 import { useMarketStore } from "@/store/market-store";
+import { useRequireAuth } from "@/hooks/use-require-auth";
 import { formatCurrency, formatPercent, cn } from "@/lib/utils";
 import { useRouter } from "next/navigation";
 import { TrendingUp, TrendingDown, Wallet, BarChart2, PlusCircle, MinusCircle, X } from "lucide-react";
@@ -110,7 +111,7 @@ export default function PortfolioPage() {
     "1W": HISTORY_1Y.slice(-7),
     "1M": HISTORY_1Y.slice(-30),
     "3M": HISTORY_1Y.slice(-90),
-    "1Y": HISTORY_1Y,
+    "6M": HISTORY_1Y.slice(-180),
   }[timeRange] ?? HISTORY_1Y.slice(-90);
 
   // ── Computed Stats ───────────────────────────────────────────
@@ -130,9 +131,31 @@ export default function PortfolioPage() {
     setFundsModal(null);
   };
 
+  const { isAuthenticated, requireAuth } = useRequireAuth();
+
+  if (!isAuthenticated) {
+    return (
+      <div className="p-6 max-w-screen-xl mx-auto flex flex-col items-center justify-center min-h-[60vh] text-center">
+        <div className="w-20 h-20 bg-muted rounded-full flex items-center justify-center mb-6">
+          <Wallet className="w-10 h-10 text-muted-foreground/50" />
+        </div>
+        <h2 className="text-2xl font-bold mb-2">Access Your Portfolio</h2>
+        <p className="text-muted-foreground max-w-md mb-8">
+          Sign in to view your personalized portfolio, track live P&L, manage holdings, and deposit funds to your paper trading account.
+        </p>
+        <button
+          onClick={() => requireAuth(() => {})}
+          className="px-6 py-3 bg-primary text-primary-foreground font-bold rounded-xl shadow-[0_0_20px_rgba(0,208,156,0.2)] hover:shadow-[0_0_30px_rgba(0,208,156,0.4)] transition-all"
+        >
+          Authenticate to View
+        </button>
+      </div>
+    );
+  }
+
   if (loading && !portfolio) {
     return (
-      <div className="p-6 space-y-4 animate-pulse">
+      <div className="p-6 space-y-4 animate-pulse max-w-[1700px] mx-auto">
         <div className="h-8 w-40 bg-muted rounded" />
         <div className="grid grid-cols-4 gap-4">
           {[...Array(4)].map((_, i) => <div key={i} className="h-24 bg-muted rounded-xl" />)}
@@ -208,7 +231,7 @@ export default function PortfolioPage() {
         <div className="flex items-center justify-between mb-4">
           <h2 className="font-semibold">Value Over Time</h2>
           <div className="flex gap-1">
-            {["1W", "1M", "3M", "1Y"].map((t) => (
+            {["1W", "1M", "3M", "6M"].map((t) => (
               <button key={t} onClick={() => setTimeRange(t)} className={cn("px-2.5 py-1 rounded-lg text-xs font-medium transition-colors", timeRange === t ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-muted")}>
                 {t}
               </button>

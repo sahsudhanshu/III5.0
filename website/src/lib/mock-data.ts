@@ -518,15 +518,38 @@ export const MOCK_NEWS: NewsArticle[] = [
   },
 ];
 
+// ============================================================
+// Seeded PRNG — mulberry32 algorithm.
+// Same seed → always the same sequence of "random" numbers.
+// This makes mock charts stable across page reloads.
+// ============================================================
+function mulberry32(seed: number) {
+  return function () {
+    seed |= 0;
+    seed = (seed + 0x6d2b79f5) | 0;
+    let t = Math.imul(seed ^ (seed >>> 15), 1 | seed);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+/** Convert a string to a numeric seed (djb2 hash). */
+function strToSeed(s: string): number {
+  let h = 5381;
+  for (let i = 0; i < s.length; i++) h = (Math.imul(h, 33) ^ s.charCodeAt(i)) >>> 0;
+  return h;
+}
+
 // ---- Portfolio History ----
 export function generatePortfolioHistory(days = 365): PortfolioSnapshot[] {
+  const rng = mulberry32(strToSeed("portfolio_history_v1"));
   const snapshots: PortfolioSnapshot[] = [];
   let value = 45000;
 
   for (let i = days; i >= 0; i--) {
-    const date = new Date();
+    const date = new Date(2026, 3, 12); // Fixed anchor date so days don't drift on reload
     date.setDate(date.getDate() - i);
-    const change = value * 0.015 * (Math.random() - 0.46);
+    const change = value * 0.015 * (rng() - 0.46);
     value = Math.max(value + change, 35000);
     snapshots.push({
       date: date.toISOString().split("T")[0],
@@ -547,44 +570,96 @@ export const MOCK_SECTOR_ALLOCATION: SectorAllocation[] = [
 ];
 
 // ---- Candlestick Data ----
+//
+// KEY DESIGN RULE: The seed is based ONLY on `symbol`, never on the timeframe.
+// This guarantees that any given calendar date always shows the SAME price
+// regardless of whether the user is viewing 1M, 3M, 1Y, etc.
+//
+// Strategy:
+//   1. Generate a MASTER series of MASTER_DAYS daily candles (seeded by symbol).
+//   2. Each timeframe just slices the last `count` candles from that master series.
+//   3. Timestamps count backwards in 24h steps from a fixed UTC anchor date.
+//
+// Change MASTER_SEED_VERSION to force-regenerate all charts simultaneously.
+const MASTER_DAYS = 252; // ~1 trading year — enough for any timeframe
+const MASTER_SEED_VERSION = "v2";
+const ANCHOR_MS = new Date("2026-04-12T00:00:00Z").getTime();
+const DAY_MS = 24 * 60 * 60 * 1000;
+
+// Module-level cache: master series per symbol (survives re-renders this session)
+const _masterSeriesCache: Record<string, CandlestickDataPoint[]> = {};
+
+function buildMasterSeries(basePrice: number, symbol: string): CandlestickDataPoint[] {
+  // Cache key uses symbol only (not basePrice) so the shape stays stable.
+  // basePrice is applied as a scale factor at the end.
+  const cacheKey = `${symbol}_shape_${MASTER_SEED_VERSION}`;
+
+  // Shape cache — stores the un-scaled walk so we only re-scale when basePrice changes
+  if (!_masterSeriesCache[cacheKey]) {
+    const rng = mulberry32(strToSeed(`${symbol}_master_daily_${MASTER_SEED_VERSION}`));
+    const data: CandlestickDataPoint[] = [];
+    let close = 100; // normalised start price; will be scaled below
+
+    for (let i = MASTER_DAYS; i >= 0; i--) {
+      const time = new Date(ANCHOR_MS - i * DAY_MS).toISOString();
+      const change = close * 0.015 * (rng() - 0.48);
+      const open = close;
+      close = Math.max(open + change, 1);
+      const high = Math.max(open, close) + Math.abs(change) * rng();
+      const low  = Math.min(open, close) - Math.abs(change) * rng();
+
+      data.push({
+        time,
+        open:   parseFloat(open.toFixed(4)),
+        high:   parseFloat(high.toFixed(4)),
+        low:    parseFloat(low.toFixed(4)),
+        close:  parseFloat(close.toFixed(4)),
+        volume: Math.floor(rng() * 1_000_000 + 200_000),
+      });
+    }
+    _masterSeriesCache[cacheKey] = data;
+  }
+
+  const shape = _masterSeriesCache[cacheKey];
+
+  // ── Scale the normalised walk so the LAST candle closes at the real price ──
+  // This anchors both line + candlestick charts to the real Finnhub /quote price
+  // without needing the paid /stock/candle endpoint.
+  const lastClose = shape[shape.length - 1].close;
+  const scale = basePrice / lastClose;
+
+  return shape.map((c) => ({
+    time:   c.time,
+    open:   parseFloat((c.open  * scale).toFixed(2)),
+    high:   parseFloat((c.high  * scale).toFixed(2)),
+    low:    parseFloat((c.low   * scale).toFixed(2)),
+    close:  parseFloat((c.close * scale).toFixed(2)),
+    volume: c.volume,
+  }));
+}
+
+
+/**
+ * Returns `count` contiguous mock candles for the given symbol.
+ * All timeframes share the same underlying daily master series so
+ * a specific date always shows the same OHLCV values.
+ *
+ * @param basePrice  Starting price (used to anchor the random walk)
+ * @param count      Number of candles to return (trailing slice)
+ * @param _interval  Unused for simulation — kept for API compat with sparklines
+ * @param symbol     Stock symbol — the ONLY thing that varies the seed
+ */
 export function generateCandlestickData(
   basePrice: number,
   count: number,
-  interval = "1D"
+  _interval = "1D",
+  symbol = "STOCK"
 ): CandlestickDataPoint[] {
-  const data: CandlestickDataPoint[] = [];
-  let close = basePrice;
-
-  const now = Date.now();
-  const intervalMs =
-    interval === "1D"
-      ? 5 * 60 * 1000
-      : interval === "1W"
-        ? 30 * 60 * 1000
-        : interval === "1M"
-          ? 4 * 60 * 60 * 1000
-          : 24 * 60 * 60 * 1000;
-
-  for (let i = count; i >= 0; i--) {
-    const time = new Date(now - i * intervalMs).toISOString();
-    const change = close * 0.015 * (Math.random() - 0.48);
-    const open = close;
-    close = Math.max(open + change, 1);
-    const high = Math.max(open, close) + Math.abs(change) * Math.random();
-    const low = Math.min(open, close) - Math.abs(change) * Math.random();
-
-    data.push({
-      time,
-      open: parseFloat(open.toFixed(2)),
-      high: parseFloat(high.toFixed(2)),
-      low: parseFloat(low.toFixed(2)),
-      close: parseFloat(close.toFixed(2)),
-      volume: Math.floor(Math.random() * 1000000 + 200000),
-    });
-  }
-
-  return data;
+  const master = buildMasterSeries(basePrice, symbol);
+  // Return the last `count` candles so all timeframes share the same tail
+  return master.slice(-Math.min(count, master.length));
 }
+
 
 // ---- Ticker symbols for top bar ----
 export const TICKER_STOCKS = MOCK_STOCKS.map((s) => ({

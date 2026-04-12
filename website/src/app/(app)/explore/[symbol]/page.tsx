@@ -9,28 +9,39 @@ import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Input } from "@/components/ui/input";
 import { useWatchlistStore } from "@/store/watchlist-store";
-import { useChatStore } from "@/store/chat-store";
+import { useChatStore, useChatContext } from "@/store/chat-store";
 import { useMarketStore } from "@/store/market-store";
 import { useDataStore, INITIAL_UNIVERSE } from "@/store/data-store";
 import { usePortfolioStore } from "@/store/portfolio-store";
+import { useRequireAuth } from "@/hooks/use-require-auth";
 import { ChartSkeleton } from "@/components/common/skeletons";
 import { toast } from "sonner";
 import {
   TrendingUp, TrendingDown, Star, Bot, ArrowLeft,
-  CandlestickChart, LineChart,
+  CandlestickChart, LineChart, Timer,
 } from "lucide-react";
 import { TradingChart } from "@/components/common/trading-chart";
 import type { TimeFilter, ChartType } from "@/types";
 
-const TIME_FILTERS: TimeFilter[] = ["1W", "1M", "3M", "1Y"];
+const TIME_FILTERS: TimeFilter[] = ["1W", "1M", "3M", "6M"];
 
+// All timeframes use daily bars ("D") since:
+//   - Finnhub /stock/candle is Premium-only, so we always fall back to mock daily data
+//   - The mock master series generates 252 daily bars anchored to the real quote price
+//   - A single "D" resolution cache key means 1M, 3M, 6M all share the same stored series
 const resMap: Record<string, "D" | "W" | "M"> = {
-  "1W": "D", "1M": "D", "3M": "D", "1Y": "W", "5Y": "M"
+  "1W": "D", "1M": "D", "3M": "D", "6M": "D", "5Y": "D"
 };
 
+// Number of DAILY bars to show for each timeframe.
 const countMap: Record<string, number> = {
-  "1W": 5, "1M": 21, "3M": 63, "1Y": 52, "5Y": 60
+  "1W": 7,   //  1 week  ≈  7 calendar days
+  "1M": 30,   //  1 month ≈ 30 days
+  "3M": 90,   //  3 months ≈ 90 days
+  "6M": 180,   //  6 months ≈ 180 days
+  "5Y": 252,   //  mock data covers max 1 year — show full series
 };
+
 
 export default function StockDetailPage() {
   const { symbol } = useParams<{ symbol: string }>();
@@ -38,10 +49,10 @@ export default function StockDetailPage() {
 
   // ── All hooks first ──
   const { isInWatchlist, addToWatchlist, removeFromWatchlist } = useWatchlistStore();
-  const { setContext, openChat } = useChatStore();
+  const { openChat } = useChatStore();
   const { prices, subscribe, unsubscribe } = useMarketStore();
-  
-  const { stocks, news, candles, fetchStockProfile, fetchNews, fetchCandles } = useDataStore();
+
+  const { stocks, news, candles, fetchStockProfile, fetchNews, fetchCandles, candleRetryCountdown } = useDataStore();
   const { portfolio, fetchPortfolio, placeOrder } = usePortfolioStore();
 
   const [loading, setLoading] = useState(true);
@@ -56,7 +67,7 @@ export default function StockDetailPage() {
 
   // Real-time overrides
   const livePriceData = prices[targetSymbol === "BTC" ? "BINANCE:BTCUSDT" : targetSymbol];
-  
+
   const baseStock = stocks[targetSymbol];
   const stock = baseStock ? {
     ...baseStock,
@@ -67,47 +78,104 @@ export default function StockDetailPage() {
 
   // Derived lists
   const relatedNews = news[targetSymbol] || [];
-  
+
   const cacheKey = `${targetSymbol}_${resMap[timeFilter as "1M"] || "D"}`;
-  
+
   const chartData = useMemo(() => {
     const rawCandles = candles[cacheKey] || [];
     if (rawCandles.length > 0) {
       return rawCandles.slice(-countMap[timeFilter as "1M"] || -20);
     }
-    // Simulation fallback using baseStock (not live ticker) to strictly prevent extreme Recharts recreation lag!
+    // Simulation fallback — uses a seeded PRNG (symbol+timeframe) so the chart
+    // is always identical across reloads for the same stock.
     if (baseStock) {
-      return generateCandlestickData(baseStock.price, countMap[timeFilter as "1M"] || 20, timeFilter);
+      return generateCandlestickData(baseStock.price, countMap[timeFilter as "1M"] || 20, timeFilter, targetSymbol);
     }
     return [];
-  }, [candles, cacheKey, timeFilter, baseStock]);
+  }, [candles, cacheKey, timeFilter, baseStock, targetSymbol]);
+
 
   const loadData = useCallback(async () => {
     // Only set full page loading if we haven't resolved the core stock yet
     if (!baseStock) {
       setTimeout(() => setLoading(true), 0);
     }
-    
+
     await fetchStockProfile(targetSymbol);
     await Promise.all([
       fetchNews(targetSymbol),
       fetchCandles(targetSymbol, resMap[timeFilter as "1M"] || "D", countMap[timeFilter as "1M"] || 60)
     ]);
-    
+
     setTimeout(() => setLoading(false), 0);
   }, [targetSymbol, timeFilter, fetchStockProfile, fetchNews, fetchCandles, baseStock]);
 
   useEffect(() => { loadData(); }, [loadData]);
-  
+
+  // Rich context for Aria — rebuilt whenever page data changes
+  const holding = portfolio?.holdings?.find(h => h.symbol === targetSymbol);
+  const stockContext = stock ? (() => {
+    const lines: string[] = [];
+
+    // ── Basic identity ──
+    lines.push(`PAGE: Stock Detail — ${stock.symbol} (${stock.name})`);
+    lines.push(`Exchange: ${stock.exchange} | Sector: ${stock.sector} | Industry: ${stock.industry ?? "N/A"}`);
+
+    // ── Price & performance ──
+    lines.push(`\nPRICE DATA:`);
+    lines.push(`  Current Price : $${stock.price.toFixed(2)}`);
+    lines.push(`  Today's Change: ${stock.changePercent >= 0 ? "+" : ""}${stock.changePercent.toFixed(2)}% ($${stock.change.toFixed(2)})`);
+    lines.push(`  52-Week High  : $${stock.high52w?.toFixed(2) ?? "N/A"}`);
+    lines.push(`  52-Week Low   : $${stock.low52w?.toFixed(2) ?? "N/A"}`);
+    lines.push(`  Market Cap    : $${stock.marketCap ? (stock.marketCap / 1e9).toFixed(1) + "B" : "N/A"}`);
+    lines.push(`  Volume        : ${stock.volume ? stock.volume.toLocaleString() : "N/A"}`);
+
+    // ── Key metrics ──
+    lines.push(`\nKEY METRICS:`);
+    lines.push(`  P/E Ratio   : ${stock.pe?.toFixed(1) ?? "N/A"}`);
+    lines.push(`  EPS         : ${stock.eps?.toFixed(2) ?? "N/A"}`);
+    lines.push(`  Beta        : ${stock.beta?.toFixed(2) ?? "N/A"}`);
+    lines.push(`  Div. Yield  : ${stock.dividendYield?.toFixed(2) ?? "0"}%`);
+    lines.push(`  Prev. Close : $${stock.previousClose?.toFixed(2) ?? "N/A"}`);
+
+    // ── User's portfolio position ──
+    if (holding) {
+      const currentValue = holding.qty * stock.price;
+      const investedValue = holding.qty * holding.avgBuyPrice;
+      const pnl = currentValue - investedValue;
+      const pnlPct = ((pnl / investedValue) * 100).toFixed(2);
+      lines.push(`\nUSER PORTFOLIO POSITION:`);
+      lines.push(`  Shares Held  : ${holding.qty}`);
+      lines.push(`  Avg Buy Price: $${holding.avgBuyPrice.toFixed(2)}`);
+      lines.push(`  Current Value: $${currentValue.toFixed(2)}`);
+      lines.push(`  Invested     : $${investedValue.toFixed(2)}`);
+      lines.push(`  P&L          : ${pnl >= 0 ? "+" : ""}$${pnl.toFixed(2)} (${pnl >= 0 ? "+" : ""}${pnlPct}%)`);
+    } else {
+      lines.push(`\nUSER PORTFOLIO POSITION: Not currently holding ${stock.symbol}.`);
+      lines.push(`  Available Cash: $${portfolio?.cashBalance?.toFixed(2) ?? "N/A"}`);
+    }
+
+    // ── Recent news ──
+    if (relatedNews.length > 0) {
+      lines.push(`\nRECENT NEWS (${relatedNews.length} articles):`);
+      relatedNews.slice(0, 3).forEach((n: any, i: number) => {
+        lines.push(`  ${i + 1}. ${n.title} — ${n.source ?? ""}`);
+      });
+    }
+
+    return lines.join("\n");
+  })() : `PAGE: Stock Detail — ${targetSymbol} (loading...)`;
+
+  useChatContext(stockContext);
+
+
   useEffect(() => {
-    setContext(targetSymbol);
     const subSymbol = targetSymbol === "BTC" ? "BINANCE:BTCUSDT" : targetSymbol;
     subscribe(subSymbol);
     return () => {
-      setContext(null);
       unsubscribe(subSymbol);
     };
-  }, [targetSymbol, setContext, subscribe, unsubscribe]);
+  }, [targetSymbol, subscribe, unsubscribe]);
 
   useEffect(() => {
     fetchPortfolio();
@@ -117,51 +185,57 @@ export default function StockDetailPage() {
   const isPositive = (stock?.changePercent ?? 0) >= 0;
   const inWatchlist = stock ? isInWatchlist(stock.symbol) : false;
 
+  const { requireAuth } = useRequireAuth();
+
   const toggleWatchlist = () => {
-    if (!stock) return;
-    if (inWatchlist) {
-      removeFromWatchlist(stock.symbol);
-      toast.success(`${stock.symbol} removed`);
-    } else {
-      addToWatchlist({ symbol: stock.symbol, name: stock.name, exchange: stock.exchange, price: stock.price, change: stock.change, changePercent: stock.changePercent, volume: stock.volume, addedAt: new Date().toISOString() });
-      toast.success(`${stock.symbol} added to watchlist ⭐`);
-    }
+    requireAuth(() => {
+      if (!stock) return;
+      if (inWatchlist) {
+        removeFromWatchlist(stock.symbol);
+        toast.success(`${stock.symbol} removed`);
+      } else {
+        addToWatchlist({ symbol: stock.symbol, name: stock.name, exchange: stock.exchange, price: stock.price, change: stock.change, changePercent: stock.changePercent, volume: stock.volume, addedAt: new Date().toISOString() });
+        toast.success(`${stock.symbol} added to watchlist ⭐`);
+      }
+    });
   };
 
   const handleOrder = async () => {
-    if (!stock || parseInt(qty) <= 0) { toast.error("Enter a valid quantity"); return; }
-    const qtyNum = parseInt(qty);
-    const total = qtyNum * stock.price;
+    requireAuth(async () => {
+      if (!stock || parseInt(qty) <= 0) { toast.error("Enter a valid quantity"); return; }
+      const qtyNum = parseInt(qty);
+      const total = qtyNum * stock.price;
 
-    if (orderType === "BUY" && (portfolio?.cashBalance ?? 0) < total) {
-      toast.error(`Insufficient funds. Need ${formatCurrency(total)}, have ${formatCurrency(portfolio?.cashBalance ?? 0)}`);
-      return;
-    }
-    if (orderType === "SELL") {
-      const holding = portfolio?.holdings?.find(h => h.symbol === stock.symbol);
-      if (!holding || holding.qty < qtyNum) {
-        toast.error(`Insufficient shares. You own ${holding?.qty ?? 0} shares.`);
+      if (orderType === "BUY" && (portfolio?.cashBalance ?? 0) < total) {
+        toast.error(`Insufficient funds. Need ${formatCurrency(total)}, have ${formatCurrency(portfolio?.cashBalance ?? 0)}`);
         return;
       }
-    }
+      if (orderType === "SELL") {
+        const holding = portfolio?.holdings?.find(h => h.symbol === stock.symbol);
+        if (!holding || holding.qty < qtyNum) {
+          toast.error(`Insufficient shares. You own ${holding?.qty ?? 0} shares.`);
+          return;
+        }
+      }
 
-    setOrderLoading(true);
-    const ok = await placeOrder({
-      type: orderType,
-      symbol: stock.symbol,
-      name: stock.name,
-      exchange: stock.exchange,
-      sector: stock.sector,
-      qty: qtyNum,
-      price: stock.price,
-    });
-    setOrderLoading(false);
-
-    if (ok) {
-      toast.success(`✅ ${orderType} ${qty} shares of ${stock.symbol}`, {
-        description: `@ ${formatCurrency(stock.price)} · Total: ${formatCurrency(total)}`,
+      setOrderLoading(true);
+      const ok = await placeOrder({
+        type: orderType,
+        symbol: stock.symbol,
+        name: stock.name,
+        exchange: stock.exchange,
+        sector: stock.sector,
+        qty: qtyNum,
+        price: stock.price,
       });
-    }
+      setOrderLoading(false);
+
+      if (ok) {
+        toast.success(`✅ ${orderType} ${qty} shares of ${stock.symbol}`, {
+          description: `@ ${formatCurrency(stock.price)} · Total: ${formatCurrency(total)}`,
+        });
+      }
+    });
   };
 
   if (!loading && !stock) {
@@ -194,10 +268,10 @@ export default function StockDetailPage() {
           {/* Stock header */}
           <div className="groww-card p-5">
             {loading && !stock ? (
-               <div className="animate-pulse space-y-4">
-                 <div className="h-12 w-48 bg-muted rounded"></div>
-                 <div className="h-10 w-32 bg-muted rounded"></div>
-               </div>
+              <div className="animate-pulse space-y-4">
+                <div className="h-12 w-48 bg-muted rounded"></div>
+                <div className="h-10 w-32 bg-muted rounded"></div>
+              </div>
             ) : stock ? (
               <>
                 <div className="flex flex-col sm:flex-row sm:items-start gap-4 justify-between">
@@ -291,11 +365,28 @@ export default function StockDetailPage() {
             {loading && chartData.length === 0 ? (
               <ChartSkeleton height={320} />
             ) : (
-              <TradingChart 
-                data={chartData} 
-                type={chartType === "candlestick" ? "candlestick" : "area"} 
-                height={320} 
-              />
+              <div className="relative">
+                {/* Rate-limit countdown banner */}
+                {candleRetryCountdown !== null && candleRetryCountdown > 0 && (
+                  <div className="absolute inset-x-0 top-0 z-20 flex items-center justify-center">
+                    <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-amber-500/10 border border-amber-500/30 text-amber-600 dark:text-amber-400 text-xs font-medium shadow-sm backdrop-blur-sm">
+                      <Timer className="w-3.5 h-3.5 animate-pulse flex-shrink-0" />
+                      <span>
+                        Chart data rate-limited — fetching real data in{" "}
+                        <span className="font-mono font-bold tabular-nums">{candleRetryCountdown}s</span>
+                        {" "}(showing simulation meanwhile)
+                      </span>
+                    </div>
+                  </div>
+                )}
+                <TradingChart
+                  data={chartData}
+                  type={chartType === "candlestick" ? "candlestick" : "area"}
+                  height={320}
+                  symbol={targetSymbol}
+                  timeframe={timeFilter}
+                />
+              </div>
             )}
           </div>
 
@@ -311,64 +402,339 @@ export default function StockDetailPage() {
                   ))}
                 </TabsList>
 
-                <TabsContent value="overview" className="p-5">
-                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-5">
-                    {[
-                      ["Open",          formatCurrency(stock.open)],
-                      ["Day High",      formatCurrency(stock.dayHigh)],
-                      ["Day Low",       formatCurrency(stock.dayLow)],
-                      ["Prev. Close",   formatCurrency(stock.previousClose)],
-                      ["Volume",        formatNumber(stock.volume)],
-                      ["Mkt Cap",       `$${formatNumber(stock.marketCap)}`],
-                      ["P/E Ratio",     `${stock.pe.toFixed(1)}x`],
-                      ["P/B Ratio",     `${stock.pb.toFixed(1)}x`],
-                      ["EPS",           formatCurrency(stock.eps)],
-                      ["Dividend Yield",`${stock.dividendYield.toFixed(2)}%`],
-                      ["Beta",          stock.beta.toFixed(2)],
-                      ["52W High",      formatCurrency(stock.high52w)],
-                      ["52W Low",       formatCurrency(stock.low52w)],
-                    ].map(([label, value]) => (
-                      <div key={label}>
-                        <p className="text-[10px] text-muted-foreground mb-0.5">{label}</p>
-                        <p className="text-sm font-semibold num text-foreground">{value}</p>
-                      </div>
-                    ))}
+                {/* ── OVERVIEW TAB ── */}
+                <TabsContent value="overview" className="p-0">
+                  {/* 52-Week Range Bar */}
+                  <div className="px-5 pt-5 pb-4 border-b border-border/60">
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="text-sm font-semibold text-foreground">52-Week Range</span>
+                      <span className="text-xs text-muted-foreground num">
+                        Current: <span className="font-bold text-foreground">{formatCurrency(stock.price)}</span>
+                      </span>
+                    </div>
+                    <div className="relative h-2 bg-muted rounded-full overflow-hidden">
+                      <div
+                        className="absolute h-full rounded-full bg-gradient-to-r from-bear via-primary to-bull"
+                        style={{ width: "100%" }}
+                      />
+                      <div
+                        className="absolute top-1/2 -translate-y-1/2 w-3 h-3 bg-foreground border-2 border-background rounded-full shadow-md z-10"
+                        style={{
+                          left: `calc(${Math.min(Math.max(((stock.price - stock.low52w) / (stock.high52w - stock.low52w || 1)) * 100, 2), 98)}% - 6px)`
+                        }}
+                      />
+                    </div>
+                    <div className="flex justify-between mt-1.5">
+                      <span className="text-xs text-bear font-semibold num">{formatCurrency(stock.low52w)}</span>
+                      <span className="text-xs text-bull font-semibold num">{formatCurrency(stock.high52w)}</span>
+                    </div>
                   </div>
-                </TabsContent>
 
-                <TabsContent value="news" className="p-5 space-y-3">
-                  {relatedNews.length === 0
-                    ? <p className="text-sm text-muted-foreground">No recent news for {stock.symbol}. Check Finnhub endpoints.</p>
-                    : relatedNews.map((n) => (
-                      <div key={n.id} className="pb-3 border-b border-border last:border-0 last:pb-0">
-                        <div className="flex gap-2 mb-1.5">
-                          <Badge variant="secondary" className={cn("text-[9px]", n.sentiment === "positive" ? "bg-bull-muted text-bull" : n.sentiment === "negative" ? "bg-bear-muted text-bear" : "bg-muted text-muted-foreground")}>{n.sentiment}</Badge>
-                          <span className="text-[10px] text-muted-foreground">{n.source}</span>
+                  {/* Today's Stats */}
+                  <div className="px-5 py-4 border-b border-border/60">
+                    <p className="text-xs font-bold text-muted-foreground uppercase tracking-wider mb-3">Today&apos;s Trading</p>
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-x-6 gap-y-4">
+                      {[
+                        { label: "Open", value: formatCurrency(stock.open), color: "" },
+                        { label: "Day High", value: formatCurrency(stock.dayHigh), color: "text-bull" },
+                        { label: "Day Low", value: formatCurrency(stock.dayLow), color: "text-bear" },
+                        { label: "Prev. Close", value: formatCurrency(stock.previousClose), color: "" },
+                      ].map(({ label, value, color }) => (
+                        <div key={label}>
+                          <p className="text-xs text-muted-foreground mb-1">{label}</p>
+                          <p className={cn("text-base font-bold num", color || "text-foreground")}>{value}</p>
                         </div>
-                        <p className="text-xs font-semibold text-foreground leading-relaxed">{n.title}</p>
-                      </div>
-                    ))
-                  }
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Fundamentals */}
+                  <div className="px-5 py-4 border-b border-border/60">
+                    <p className="text-xs font-bold text-muted-foreground uppercase tracking-wider mb-3">Fundamentals</p>
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-x-6 gap-y-4">
+                      {[
+                        { label: "Market Cap", value: `$${formatNumber(stock.marketCap)}` },
+                        { label: "Volume", value: formatNumber(stock.volume) },
+                        { label: "P/E Ratio", value: stock.pe > 0 ? `${stock.pe.toFixed(1)}x` : "N/A" },
+                        { label: "P/B Ratio", value: stock.pb > 0 ? `${stock.pb.toFixed(1)}x` : "N/A" },
+                        { label: "EPS (TTM)", value: stock.eps > 0 ? formatCurrency(stock.eps) : "N/A" },
+                        { label: "Dividend Yield", value: `${stock.dividendYield.toFixed(2)}%` },
+                        { label: "Beta", value: stock.beta.toFixed(2) },
+                        { label: "Exchange", value: stock.exchange },
+                      ].map(({ label, value }) => (
+                        <div key={label}>
+                          <p className="text-xs text-muted-foreground mb-1">{label}</p>
+                          <p className="text-base font-semibold num text-foreground">{value}</p>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Risk / Volatility indicators */}
+                  <div className="px-5 py-4 border-b border-border/60">
+                    <p className="text-xs font-bold text-muted-foreground uppercase tracking-wider mb-3">Risk &amp; Volatility</p>
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                      {/* Beta gauge */}
+                      {[
+                        {
+                          label: "Beta",
+                          value: stock.beta,
+                          desc: stock.beta < 0.8 ? "Low Volatility" : stock.beta < 1.2 ? "Market-Like" : "High Volatility",
+                          color: stock.beta < 0.8 ? "text-bull" : stock.beta < 1.2 ? "text-primary" : "text-bear",
+                          barColor: stock.beta < 0.8 ? "bg-bull" : stock.beta < 1.2 ? "bg-primary" : "bg-bear",
+                          pct: Math.min((stock.beta / 3) * 100, 100),
+                          display: stock.beta.toFixed(2),
+                        },
+                        {
+                          label: "P/E vs Sector",
+                          value: stock.pe,
+                          desc: stock.pe <= 0 ? "Not Applicable" : stock.pe < 15 ? "Undervalued" : stock.pe < 30 ? "Fairly Valued" : "Premium",
+                          color: stock.pe <= 0 ? "text-muted-foreground" : stock.pe < 15 ? "text-bull" : stock.pe < 30 ? "text-primary" : "text-bear",
+                          barColor: stock.pe <= 0 ? "bg-muted" : stock.pe < 15 ? "bg-bull" : stock.pe < 30 ? "bg-primary" : "bg-bear",
+                          pct: stock.pe <= 0 ? 0 : Math.min((stock.pe / 60) * 100, 100),
+                          display: stock.pe > 0 ? `${stock.pe.toFixed(1)}x` : "N/A",
+                        },
+                        {
+                          label: "Div. Yield",
+                          value: stock.dividendYield,
+                          desc: stock.dividendYield === 0 ? "No Dividend" : stock.dividendYield < 1 ? "Low Yield" : stock.dividendYield < 3 ? "Moderate" : "High Yield",
+                          color: stock.dividendYield === 0 ? "text-muted-foreground" : stock.dividendYield < 1 ? "text-muted-foreground" : stock.dividendYield < 3 ? "text-primary" : "text-bull",
+                          barColor: stock.dividendYield === 0 ? "bg-muted" : "bg-bull",
+                          pct: Math.min((stock.dividendYield / 6) * 100, 100),
+                          display: `${stock.dividendYield.toFixed(2)}%`,
+                        },
+                      ].map((item) => (
+                        <div key={item.label} className="bg-muted/30 rounded-xl p-3">
+                          <div className="flex items-center justify-between mb-2">
+                            <span className="text-xs text-muted-foreground font-medium">{item.label}</span>
+                            <span className={cn("text-sm font-bold num", item.color)}>{item.display}</span>
+                          </div>
+                          <div className="h-1.5 bg-muted rounded-full overflow-hidden mb-1.5">
+                            <div className={cn("h-full rounded-full transition-all", item.barColor)} style={{ width: `${item.pct}%` }} />
+                          </div>
+                          <p className={cn("text-xs font-semibold", item.color)}>{item.desc}</p>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+
                 </TabsContent>
 
-                <TabsContent value="financials" className="p-5">
-                  <div className="grid grid-cols-2 gap-4">
-                    {[
-                      { label: "Revenue (Q1)", value: "$24.1B", sub: "Estimated", ok: true },
-                      { label: "Net Profit",        value: "$2.9B", sub: "Estimated", ok: true },
-                    ].map(({ label, value, sub, ok }) => (
-                      <div key={label} className="bg-muted/40 rounded-xl p-4">
-                        <p className="text-[10px] text-muted-foreground mb-1">{label}</p>
-                        <p className="text-base font-bold num text-foreground">{value}</p>
-                        <p className={cn("text-xs mt-0.5", ok ? "text-bull" : "text-muted-foreground")}>{sub}</p>
+                {/* ── NEWS TAB ── */}
+                <TabsContent value="news" className="p-0">
+                  {relatedNews.length === 0 ? (
+                    <div className="flex flex-col items-center justify-center py-16 text-center px-6">
+                      <div className="w-12 h-12 rounded-full bg-muted flex items-center justify-center mb-3">
+                        <svg className="w-6 h-6 text-muted-foreground" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M19 20H5a2 2 0 01-2-2V6a2 2 0 012-2h10a2 2 0 012 2v1m2 13a2 2 0 01-2-2V7m2 13a2 2 0 002-2V9a2 2 0 00-2-2h-2m-4-3H9M7 16h6M7 12h6m-6 4h.01" />
+                        </svg>
                       </div>
-                    ))}
+                      <p className="text-sm font-semibold text-foreground mb-1">No news available</p>
+                      <p className="text-xs text-muted-foreground">Live news requires Finnhub API access. Check your API key.</p>
+                    </div>
+                  ) : (
+                    <div className="divide-y divide-border/60">
+                      {relatedNews.map((n, idx) => {
+                        const timeAgo = (() => {
+                          const diff = Date.now() - new Date(n.publishedAt).getTime();
+                          const h = Math.floor(diff / 3600000);
+                          const m = Math.floor((diff % 3600000) / 60000);
+                          return h > 0 ? `${h}h ago` : `${m}m ago`;
+                        })();
+                        const sentimentConfig = {
+                          positive: { cls: "bg-bull/10 text-bull border-bull/20", dot: "bg-bull" },
+                          negative: { cls: "bg-bear/10 text-bear border-bear/20", dot: "bg-bear" },
+                          neutral: { cls: "bg-muted text-muted-foreground border-border", dot: "bg-muted-foreground" },
+                        }[n.sentiment] ?? { cls: "bg-muted text-muted-foreground border-border", dot: "bg-muted-foreground" };
+                        return (
+                          <a
+                            key={n.id}
+                            href={n.url !== "#" ? n.url : undefined}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className={cn(
+                              "flex gap-3 px-5 py-4 transition-colors",
+                              n.url !== "#" ? "hover:bg-muted/40 cursor-pointer" : "cursor-default"
+                            )}
+                          >
+                            {/* Rank number */}
+                            <span className="text-[10px] font-bold text-muted-foreground/40 w-4 flex-shrink-0 pt-0.5">{idx + 1}</span>
+                            <div className="flex-1 min-w-0">
+                              {/* Meta row */}
+                              <div className="flex items-center gap-2 mb-1.5 flex-wrap">
+                                <span className={cn("inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold border", sentimentConfig.cls)}>
+                                  <span className={cn("w-1.5 h-1.5 rounded-full flex-shrink-0", sentimentConfig.dot)} />
+                                  {n.sentiment}
+                                </span>
+                                <span className="text-xs font-medium text-muted-foreground">{n.source}</span>
+                                <span className="text-xs text-muted-foreground/60 ml-auto">{timeAgo}</span>
+                              </div>
+                              {/* Headline */}
+                              <p className="text-sm font-semibold text-foreground leading-snug line-clamp-2 group-hover:text-primary transition-colors">
+                                {n.title}
+                              </p>
+                              {/* Summary if available */}
+                              {n.summary && (
+                                <p className="text-xs text-muted-foreground mt-1.5 leading-relaxed line-clamp-2">{n.summary}</p>
+                              )}
+                              {/* Related symbols */}
+                              {n.relatedSymbols && n.relatedSymbols.length > 0 && (
+                                <div className="flex gap-1 mt-1.5 flex-wrap">
+                                  {n.relatedSymbols.slice(0, 4).map((sym) => (
+                                    <span key={sym} className="text-xs px-2 py-0.5 bg-primary/10 text-primary rounded font-medium">{sym}</span>
+                                  ))}
+                                </div>
+                              )}
+                            </div>
+                            {/* Article image */}
+                            {n.imageUrl && (
+                              <div className="w-16 h-14 rounded-lg overflow-hidden flex-shrink-0 bg-muted">
+                                {/* eslint-disable-next-line @next/next/no-img-element */}
+                                <img src={n.imageUrl} alt="" className="w-full h-full object-cover" onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }} />
+                              </div>
+                            )}
+                          </a>
+                        );
+                      })}
+                    </div>
+                  )}
+                </TabsContent>
+
+                {/* ── FINANCIALS TAB ── */}
+                <TabsContent value="financials" className="p-0">
+                  {/* Income Highlights */}
+                  <div className="px-5 pt-5 pb-4 border-b border-border/60">
+                    <p className="text-xs font-bold text-muted-foreground uppercase tracking-wider mb-3">Income Statement (TTM)</p>
+                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                      {[
+                        { label: "Revenue", value: stock.eps > 0 ? formatCurrency(stock.eps * (stock.marketCap / (stock.price || 1) / 1e6 * 0.08)) : "N/A", badge: "Est.", badgeOk: true },
+                        { label: "EPS (TTM)", value: stock.eps > 0 ? formatCurrency(stock.eps) : "N/A", badge: "Reported", badgeOk: true },
+                        { label: "Net Income", value: stock.eps > 0 ? `$${((stock.eps * stock.marketCap) / (stock.price || 1) / 1e9).toFixed(1)}B` : "N/A", badge: "Est.", badgeOk: true },
+                        { label: "Profit Margin", value: stock.pe > 0 && stock.eps > 0 ? `${((stock.eps / (stock.price / stock.pe)) * 100).toFixed(1)}%` : "N/A", badge: "", badgeOk: false },
+                        { label: "P/E Ratio", value: stock.pe > 0 ? `${stock.pe.toFixed(1)}x` : "N/A", badge: "", badgeOk: false },
+                        { label: "P/B Ratio", value: stock.pb > 0 ? `${stock.pb.toFixed(1)}x` : "N/A", badge: "", badgeOk: false },
+                      ].map(({ label, value, badge, badgeOk }) => (
+                        <div key={label} className="bg-muted/30 rounded-xl p-3.5">
+                          <p className="text-xs text-muted-foreground mb-1">{label}</p>
+                          <p className="text-lg font-black num text-foreground">{value}</p>
+                          {badge && <span className={cn("text-xs font-semibold mt-1 inline-block", badgeOk ? "text-bull" : "text-muted-foreground")}>{badge}</span>}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Valuation */}
+                  <div className="px-5 py-4 border-b border-border/60">
+                    <p className="text-xs font-bold text-muted-foreground uppercase tracking-wider mb-3">Valuation</p>
+                    <div className="space-y-2.5">
+                      {[
+                        {
+                          label: "P/E Ratio",
+                          value: stock.pe > 0 ? stock.pe : null,
+                          format: (v: number) => `${v.toFixed(1)}x`,
+                          low: 10, high: 50,
+                          verdict: stock.pe <= 0 ? "N/A" : stock.pe < 15 ? "Cheap" : stock.pe < 25 ? "Fair" : stock.pe < 40 ? "Pricey" : "Expensive",
+                          verdictColor: stock.pe <= 0 ? "text-muted-foreground" : stock.pe < 15 ? "text-bull" : stock.pe < 25 ? "text-primary" : "text-bear",
+                        },
+                        {
+                          label: "P/B Ratio",
+                          value: stock.pb > 0 ? stock.pb : null,
+                          format: (v: number) => `${v.toFixed(1)}x`,
+                          low: 1, high: 10,
+                          verdict: stock.pb <= 0 ? "N/A" : stock.pb < 1 ? "Undervalued" : stock.pb < 3 ? "Fair" : "Overvalued",
+                          verdictColor: stock.pb <= 0 ? "text-muted-foreground" : stock.pb < 1 ? "text-bull" : stock.pb < 3 ? "text-primary" : "text-bear",
+                        },
+                        {
+                          label: "Dividend Yield",
+                          value: stock.dividendYield,
+                          format: (v: number) => `${v.toFixed(2)}%`,
+                          low: 0, high: 6,
+                          verdict: stock.dividendYield === 0 ? "No Dividend" : stock.dividendYield < 1.5 ? "Low" : stock.dividendYield < 4 ? "Moderate" : "High",
+                          verdictColor: stock.dividendYield === 0 ? "text-muted-foreground" : "text-bull",
+                        },
+                      ].map((row) => (
+                        <div key={row.label} className="flex items-center gap-3">
+                          <span className="text-xs text-muted-foreground w-28 flex-shrink-0">{row.label}</span>
+                          <div className="flex-1 h-1.5 bg-muted rounded-full overflow-hidden">
+                            <div
+                              className="h-full rounded-full bg-primary transition-all"
+                              style={{ width: row.value === null ? "0%" : `${Math.min(((row.value - row.low) / (row.high - row.low)) * 100, 100)}%` }}
+                            />
+                          </div>
+                          <span className="text-sm font-bold num text-foreground w-14 text-right">{row.value !== null ? row.format(row.value) : "N/A"}</span>
+                          <span className={cn("text-xs font-semibold w-24 text-right", row.verdictColor)}>{row.verdict}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Dividend info */}
+                  <div className="px-5 py-4 border-b border-border/60">
+                    <p className="text-xs font-bold text-muted-foreground uppercase tracking-wider mb-3">Dividend</p>
+                    <div className="grid grid-cols-3 gap-3">
+                      <div className="bg-muted/30 rounded-xl p-3.5">
+                        <p className="text-xs text-muted-foreground mb-1">Annual Yield</p>
+                        <p className="text-xl font-black num text-foreground">{stock.dividendYield.toFixed(2)}%</p>
+                        <p className={cn("text-xs mt-0.5 font-semibold", stock.dividendYield > 0 ? "text-bull" : "text-muted-foreground")}>
+                          {stock.dividendYield > 0 ? "Pays Dividend" : "No Dividend"}
+                        </p>
+                      </div>
+                      <div className="bg-muted/30 rounded-xl p-3.5">
+                        <p className="text-xs text-muted-foreground mb-1">Annual Per Share</p>
+                        <p className="text-xl font-black num text-foreground">
+                          {stock.dividendYield > 0 ? formatCurrency((stock.dividendYield / 100) * stock.price) : "—"}
+                        </p>
+                        <p className="text-xs mt-0.5 font-semibold text-muted-foreground">Est.</p>
+                      </div>
+                      <div className="bg-muted/30 rounded-xl p-3.5">
+                        <p className="text-xs text-muted-foreground mb-1">Payout Type</p>
+                        <p className="text-base font-bold text-foreground mt-1">
+                          {stock.dividendYield > 0 ? "Quarterly" : "None"}
+                        </p>
+                        <p className="text-xs mt-0.5 font-semibold text-muted-foreground">Typical</p>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Analyst snapshot */}
+                  <div className="px-5 py-4">
+                    <p className="text-xs font-bold text-muted-foreground uppercase tracking-wider mb-3">Analyst Snapshot</p>
+                    <div className="flex items-center gap-4">
+                      <div className="flex flex-col items-center">
+                        <div className={cn(
+                          "w-14 h-14 rounded-full flex items-center justify-center text-xs font-black border-2",
+                          stock.pe > 0 && stock.pe < 25 ? "border-bull text-bull bg-bull/10" : "border-primary text-primary bg-primary/10"
+                        )}>
+                          {stock.pe > 0 && stock.pe < 20 ? "BUY" : stock.pe < 30 ? "HOLD" : "WATCH"}
+                        </div>
+                        <p className="text-xs text-muted-foreground mt-1.5 font-medium">Consensus</p>
+                      </div>
+                      <div className="flex-1 space-y-1.5">
+                        {[
+                          { label: "Strong Buy", pct: stock.pe > 0 && stock.pe < 20 ? 55 : 30, color: "bg-bull" },
+                          { label: "Buy", pct: stock.pe > 0 && stock.pe < 30 ? 25 : 20, color: "bg-bull/60" },
+                          { label: "Hold", pct: 15, color: "bg-primary" },
+                          { label: "Sell", pct: 5, color: "bg-bear/60" },
+                        ].map((r) => (
+                          <div key={r.label} className="flex items-center gap-2">
+                            <span className="text-xs text-muted-foreground w-24">{r.label}</span>
+                            <div className="flex-1 h-2 bg-muted rounded-full overflow-hidden">
+                              <div className={cn("h-full rounded-full", r.color)} style={{ width: `${r.pct}%` }} />
+                            </div>
+                            <span className="text-xs font-semibold text-foreground w-8 text-right">{r.pct}%</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                    <p className="text-xs text-muted-foreground mt-3">* Ratings are estimated from valuation multiples. Not financial advice.</p>
                   </div>
                 </TabsContent>
               </Tabs>
             </div>
           )}
         </div>
+
 
         {/* ── Right: Order Panel ── */}
         <div className="space-y-4">
@@ -442,24 +808,24 @@ export default function StockDetailPage() {
                       : `${orderType} ${stock.symbol}`
                     }
                   </button>
-                  <p className="text-[10px] text-muted-foreground text-center">Paper trading — no real money involved</p>
                 </div>
               </div>
 
-              {/* Key Metrics */}
-              <div className="groww-card p-4 space-y-3">
-                <p className="text-sm font-bold text-foreground">Key Metrics</p>
-                {[
-                  { label: "52-Week High",  value: formatCurrency(stock.high52w),           color: "text-bull" },
-                  { label: "52-Week Low",   value: formatCurrency(stock.low52w),            color: "text-bear" },
-                  { label: "Beta",          value: stock.beta.toFixed(2),                   color: "" },
-                  { label: "Div. Yield",    value: `${stock.dividendYield.toFixed(2)}%`,    color: "" },
-                ].map(({ label, value, color }) => (
-                  <div key={label} className="flex items-center justify-between py-1.5 border-b border-border/50 last:border-0">
-                    <span className="text-xs text-muted-foreground">{label}</span>
-                    <span className={cn("text-xs font-semibold num", color)}>{value}</span>
-                  </div>
-                ))}
+              {/* About Company */}
+              <div className="groww-card p-4">
+                <p className="text-base font-bold text-foreground mb-3">About {stock.symbol}</p>
+                <p className="text-sm text-muted-foreground leading-relaxed">
+                  <span className="font-semibold text-foreground">{stock.name}</span> is listed on the{" "}
+                  <span className="font-semibold text-foreground">{stock.exchange}</span> exchange under the{" "}
+                  <span className="font-semibold text-foreground">{stock.sector}</span> sector. With a market
+                  capitalization of <span className="font-semibold text-foreground">${formatNumber(stock.marketCap)}</span>,
+                  it trades at a P/E of{" "}
+                  <span className="font-semibold text-foreground">{stock.pe > 0 ? `${stock.pe.toFixed(1)}x` : "N/A"}</span> and
+                  offers a dividend yield of{" "}
+                  <span className="font-semibold text-foreground">{stock.dividendYield.toFixed(2)}%</span>.{" "}
+                  The stock has a beta of <span className="font-semibold text-foreground">{stock.beta.toFixed(2)}</span>,
+                  indicating {stock.beta < 0.8 ? "lower" : stock.beta < 1.2 ? "similar" : "higher"} volatility compared to the broader market.
+                </p>
               </div>
 
               {/* Similar stocks */}
@@ -468,29 +834,20 @@ export default function StockDetailPage() {
                 <div className="space-y-2">
                   {INITIAL_UNIVERSE
                     .filter(s => s !== stock.symbol)
-                    .map(s => stocks[s])
-                    .filter(Boolean)
+                    .map(s => stocks[s] || { symbol: s, price: 0, changePercent: 0 })
                     .slice(0, 4)
                     .map((s) => (
-                    <div
-                      key={s.symbol}
-                      className="flex items-center gap-2 p-2 rounded-lg hover:bg-muted/50 cursor-pointer transition-colors"
-                      onClick={() => router.push(`/explore/${s.symbol}`)}
-                    >
-                      <div className="w-7 h-7 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
-                        <span className="text-[9px] font-black text-primary">{s.symbol.slice(0,2)}</span>
+                      <div
+                        key={s.symbol}
+                        className="flex items-center gap-4 p-3 rounded-xl hover:bg-muted/50 cursor-pointer transition-colors"
+                        onClick={() => router.push(`/explore/${s.symbol}`)}
+                      >
+                        <div className="w-9 h-9 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
+                          <span className="text-xs font-black text-primary">{s.symbol.slice(0, 2)}</span>
+                        </div>
+                        <p className="text-sm font-bold text-muted-foreground">{s.symbol}</p>
                       </div>
-                      <div className="flex-1 min-w-0">
-                        <p className="text-xs font-semibold truncate">{s.symbol}</p>
-                      </div>
-                      <div className="text-right flex-shrink-0">
-                        <p className="text-xs font-bold num">{formatCurrency(s.price)}</p>
-                        <p className={cn("text-[10px] font-medium num", s.changePercent >= 0 ? "text-bull" : "text-bear")}>
-                          {s.changePercent >= 0 ? "+" : ""}{formatPercent(s.changePercent)}
-                        </p>
-                      </div>
-                    </div>
-                  ))}
+                    ))}
                 </div>
               </div>
             </>

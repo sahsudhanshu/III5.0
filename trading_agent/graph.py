@@ -73,34 +73,92 @@ def _get_planner_llm() -> ChatOpenAI:
 
 def _build_system_prompt() -> str:
     """Build system prompt with comprehensive tool information."""
-    return """You are a trading analysis agent. Use tools for current data.
+    return """You are Aria, a friendly and conversational AI trading assistant built into a stock trading app.
 
-TOOLS:
+## BEHAVIOR RULES
 
-1) get_market_snapshot: symbols (list), period ('1y','2y','3y','5y','max'). Returns OHLCV arrays + summary.
+**For casual messages** (greetings like "hi", "hello", "how are you", "thanks", small talk):
+- Reply NATURALLY and CONVERSATIONALLY — no tools needed.
+- Keep it short, warm, and helpful. Example: "Hi! I'm Aria. What stock or market topic can I help you with today?"
 
-2) search_financial_news: query, max_results (<=20). Returns articles list.
+**For stock/market questions** (analysis, prices, news, recommendations):
+- Use your tools to get REAL data before responding.
+- Always cite the data you fetched.
 
-3) web_search: query, max_results (<=10). Returns web results.
+## TOOLS (only use when relevant to a finance question)
 
-Reply with a concise recommendation and cite tool data. If unsure, say HOLD.
+1) get_market_snapshot: symbols (list of tickers), period ('1y','2y','3y','5y','max')
+   Use for: price analysis, technical data, historical OHLCV, comparisons
+
+2) search_financial_news: query (str), max_results (<=20)
+   Use for: earnings news, market sentiment, company events, sector updates
+
+3) web_search: query (str), max_results (<=10)
+   Use for: broader context, analyst reports, regulatory news
+
+## RESPONSE FORMAT (for analysis)
+- Be conversational but data-driven
+- Use bullet points and bold for key numbers
+- Always include a clear takeaway or recommendation
+
+## IMPORTANT
+- NEVER call tools for casual conversation or greetings
+- Keep responses concise and focused
 """
+
+
+def _extract_text_content(content: object) -> Optional[str]:
+    if content is None:
+        return None
+    if isinstance(content, str):
+        return content.strip()
+    if isinstance(content, dict):
+        for key in ("text", "content", "output_text", "value"):
+            value = content.get(key)
+            if isinstance(value, str) and value.strip():
+                return value.strip()
+        return None
+    if isinstance(content, list):
+        parts = []
+        for block in content:
+            if isinstance(block, str) and block.strip():
+                parts.append(block.strip())
+                continue
+            if isinstance(block, dict):
+                if block.get("type") in {"text", "output_text"}:
+                    for key in ("text", "content", "output_text", "value"):
+                        value = block.get(key)
+                        if isinstance(value, str) and value.strip():
+                            parts.append(value.strip())
+                            break
+                else:
+                    for key in ("text", "content", "output_text", "value"):
+                        value = block.get(key)
+                        if isinstance(value, str) and value.strip():
+                            parts.append(value.strip())
+                            break
+        return "\n".join(parts).strip() if parts else None
+    return None
 
 
 def _get_last_ai_text(messages: list) -> Optional[str]:
     """Extract the most recent assistant text response from messages."""
     for msg in reversed(messages):
         if isinstance(msg, AIMessage) and msg.content and not msg.tool_calls:
-            content = msg.content
-            if isinstance(content, list):
-                parts = []
-                for block in content:
-                    if isinstance(block, str):
-                        parts.append(block)
-                    elif isinstance(block, dict) and block.get("type") == "text":
-                        parts.append(block.get("text", ""))
-                return "\n".join(parts).strip()
-            return str(content).strip()
+            text = _extract_text_content(msg.content)
+            if text:
+                return text
+            extra = getattr(msg, "additional_kwargs", None)
+            if isinstance(extra, dict):
+                text = _extract_text_content(extra.get("content"))
+                if text:
+                    return text
+                text = _extract_text_content(extra.get("text"))
+                if text:
+                    return text
+                text = _extract_text_content(extra.get("output_text"))
+                if text:
+                    return text
     return None
 
 
@@ -117,6 +175,13 @@ async def agent_node(state: AgentState) -> Dict[str, Any]:
     # Add system prompt if not already present
     if not messages or not isinstance(messages[0], SystemMessage):
         system_prompt = _build_system_prompt()
+
+        # Inject live page context from the frontend if available
+        page_context = (state.get("page_context") or "").strip()
+        if page_context:
+            system_prompt += f"\n\n## CURRENT PAGE CONTEXT\nThe user is currently on this page: {page_context}\nUse this context to give more relevant, tailored responses without the user needing to repeat it.\n"
+            logger.info(f"Page context injected: {page_context[:100]}")
+
         messages.insert(0, SystemMessage(content=system_prompt))
     
     # Add current human input if not in messages
@@ -130,6 +195,7 @@ async def agent_node(state: AgentState) -> Dict[str, Any]:
     logger.debug(f"LLM response: tool_calls={len(response.tool_calls) if response.tool_calls else 0}")
     
     return {"messages": messages + [response]}
+
 
 
 async def tool_executor_node(state: AgentState) -> Dict[str, Any]:
@@ -157,13 +223,20 @@ async def tool_executor_node(state: AgentState) -> Dict[str, Any]:
             if isinstance(symbols, str):
                 stripped = symbols.strip()
                 if stripped.startswith("[") and stripped.endswith("]"):
+                    # Try JSON first (double quotes), then ast.literal_eval (single quotes)
                     try:
                         import json
                         parsed = json.loads(stripped)
                         if isinstance(parsed, list):
                             symbols = parsed
                     except Exception:
-                        pass
+                        try:
+                            import ast
+                            parsed = ast.literal_eval(stripped)
+                            if isinstance(parsed, list):
+                                symbols = parsed
+                        except Exception:
+                            pass
                 else:
                     symbols = [s.strip() for s in symbols.split(",") if s.strip()]
                 tool_args["symbols"] = symbols
@@ -219,7 +292,7 @@ async def tool_executor_node(state: AgentState) -> Dict[str, Any]:
         ))
         tool_outputs.append({
             "tool": tr["tool"],
-            "args": tr["args"],
+            "args": tr["call"].get("args", {}),
             "result": tr["result"][:500],
         })
 
@@ -279,6 +352,16 @@ async def memory_update_node(state: AgentState) -> Dict[str, Any]:
         }
 
     return {"messages": messages}
+
+def route_after_memory(state: AgentState) -> Literal["planner", "end"]:
+    """
+    Only run the planner node when the agent actually used tools.
+    For plain conversational replies (no tool outputs), skip straight to END.
+    """
+    tool_outputs = state.get("tool_outputs", [])
+    if tool_outputs:
+        return "planner"
+    return "end"
 
 
 async def planner_node(state: AgentState) -> Dict[str, Any]:
@@ -343,8 +426,15 @@ def build_graph() -> StateGraph:
     # Loop back: tool executor -> agent for follow-up
     builder.add_edge("tool_executor_node", "agent_node")
 
-    # Final memory update -> end
-    builder.add_edge("memory_update", "planner")
+    # Final memory update → planner only if tools were used, else end
+    builder.add_conditional_edges(
+        "memory_update",
+        route_after_memory,
+        {
+            "planner": "planner",
+            "end": END,
+        }
+    )
     builder.add_edge("planner", END)
     
     return builder.compile()

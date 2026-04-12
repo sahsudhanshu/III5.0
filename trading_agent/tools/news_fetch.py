@@ -9,6 +9,33 @@ import asyncio
 from langchain_core.tools import tool
 
 
+async def fetch_gnews(query: str, max_results: int = 5) -> list:
+    """Fetch raw JSON articles from gnews with fallback mock data."""
+    print(f"📰 [FETCH] fetch_gnews called → query={query!r}")
+    max_results = min(max(1, max_results), 20)
+    
+    # Try to fetch real news from gnews
+    try:
+        from gnews import GNews
+        google_news = GNews(max_results=max_results * 2)
+        loop = asyncio.get_event_loop()
+        articles = await loop.run_in_executor(
+            None, 
+            google_news.get_news,
+            query,
+        )
+        
+        if articles:
+            return _clean_articles(articles, max_results)
+    except ImportError:
+        print("⚠️ gnews not installed, using fallback")
+    except Exception as e:
+        print(f"⚠️ gnews fetch error: {e}")
+    
+    # Fallback to mock news data
+    return _get_raw_mock_financial_news(query, max_results)
+
+
 @tool
 async def search_financial_news(query: str, max_results: int = 5) -> str:
     """
@@ -27,45 +54,16 @@ async def search_financial_news(query: str, max_results: int = 5) -> str:
     Returns:
         Formatted string with news articles and summaries
     """
-    print(f"📰 [TOOL] search_financial_news called → query={query!r}")
-    
-    max_results = min(max(1, max_results), 20)
-    
-    # Try to fetch real news from gnews
-    try:
-        from gnews import GNews
-        google_news = GNews(max_results=max_results * 2)
-        loop = asyncio.get_event_loop()
-        articles = await loop.run_in_executor(
-            None, 
-            google_news.get_news,
-            query,
-        )
-        
-        if articles:
-            return _format_news_results(query, articles, max_results)
-    except ImportError:
-        print("⚠️ gnews not installed, using fallback")
-    except Exception as e:
-        print(f"⚠️ gnews fetch error: {e}")
-    
-    # Fallback to mock news data
-    return _get_mock_financial_news(query, max_results)
+    articles = await fetch_gnews(query, max_results)
+    return _format_news_results(query, articles)
 
 
-def _format_news_results(query: str, articles: list, max_results: int) -> str:
-    """Format gnews articles into readable output."""
-    lines = [f"📰 Financial News: {query}\n"]
-    
-    if not articles:
-        return "\n".join(lines) + "No articles found."
-    
-    # Process articles
-    count = 0
+def _clean_articles(articles: list, max_results: int) -> list:
+    """Clean and standardize gnews articles into dicts."""
+    cleaned = []
     for article in articles:
-        if count >= max_results:
+        if len(cleaned) >= max_results:
             break
-        
         try:
             if not isinstance(article, dict):
                 continue
@@ -77,13 +75,44 @@ def _format_news_results(query: str, articles: list, max_results: int) -> str:
             url = article.get("url", "")
             summary = article.get("description") or article.get("summary", "")
             summary = summary.strip() if summary else ""
+            published = article.get("published date", "")
             
             if not title:
                 continue
             
-            # Truncate long summary
             if summary and len(summary) > 300:
                 summary = summary[:300] + "..."
+            
+            cleaned.append({
+                "title": title,
+                "source": source,
+                "summary": summary,
+                "url": url,
+                "published": published
+            })
+        except (KeyError, TypeError, AttributeError):
+            continue
+    return cleaned
+
+
+def _format_news_results(query: str, articles: list) -> str:
+    """Format structured dict articles into readable markdown output for the LLM."""
+    lines = [f"📰 Financial News: {query}\n"]
+    
+    if not articles:
+        return "\n".join(lines) + "No articles found."
+    
+    # Process articles
+    count = 0
+    for article in articles:
+        if count >= 20: # arbitrary cap
+            break
+        
+        try:
+            title = article.get("title", "")
+            source = article.get("source", "Unknown")
+            url = article.get("url", "")
+            summary = article.get("summary", "")
             
             lines.append(f"**[{count + 1}] {title}**")
             lines.append(f"Source: {source}")
@@ -94,7 +123,7 @@ def _format_news_results(query: str, articles: list, max_results: int) -> str:
             lines.append("")
             
             count += 1
-        except (KeyError, TypeError, AttributeError):
+        except Exception:
             continue
     
     if count == 0:
@@ -103,41 +132,43 @@ def _format_news_results(query: str, articles: list, max_results: int) -> str:
     return "\n".join(lines)
 
 
-def _get_mock_financial_news(query: str, max_results: int) -> str:
-    """Fallback mock financial news data."""
-    lines = [f"📰 Financial News: {query}\n"]
-    lines.append("*[Fallback Mock Data]*\n")
-    
+def _get_raw_mock_financial_news(query: str, max_results: int) -> list:
+    """Fallback mock financial news data arrays."""
     mock_articles = [
         {
             "title": "NVIDIA Q1 Earnings Beat Analyst Expectations by 25%",
             "source": "Reuters",
             "summary": "NVIDIA reported revenue of $26.1 billion for Q1, exceeding consensus estimates by $6.5 billion. Gross margins expanded to 75% driven by strong AI datacenter demand.",
             "url": "https://reuters.com/nvidia-q1",
+            "published": "2 hours ago"
         },
         {
             "title": "Federal Reserve Signals Possibility of Rate Cuts by Q3",
             "source": "Bloomberg",
             "summary": "Fed officials indicated in FOMC meeting that interest rate reductions may be warranted if inflation continues on downward trajectory. Market rallied on dovish commentary.",
             "url": "https://bloomberg.com/fed-rates",
+            "published": "4 hours ago"
         },
         {
             "title": "Apple Announces New AI Integration Across All Products",
             "source": "CNBC",
             "summary": "Apple unveiled comprehensive AI features for iPhone, Mac, and iPad during developer conference. Stock jumped 3% on announcement.",
             "url": "https://cnbc.com/apple-ai",
+            "published": "1 day ago"
         },
         {
             "title": "Treasury Yields Decline Amid Economic Slowdown Concerns",
             "source": "Financial Times",
             "summary": "10-year Treasury yields fell 18 basis points to 4.12% as investors seek safe-haven assets. Mixed employment data fuels recession debate.",
             "url": "https://ft.com/treasuries",
+            "published": "1 day ago"
         },
         {
             "title": "Energy Markets Rally on Middle East Supply Disruptions",
             "source": "MarketWatch",
             "summary": "Oil futures climbed 3.2% as geopolitical tensions threaten supply from key regions. WTI crude reached $93 per barrel, highest in 6 weeks.",
             "url": "https://marketwatch.com/energy",
+            "published": "2 days ago"
         },
     ]
     
@@ -150,13 +181,4 @@ def _get_mock_financial_news(query: str, max_results: int) -> str:
     
     # Use relevant articles if found, otherwise use all
     articles_to_show = relevant if relevant else mock_articles
-    articles_to_show = articles_to_show[:max_results]
-    
-    for i, article in enumerate(articles_to_show, 1):
-        lines.append(f"**[{i}] {article['title']}**")
-        lines.append(f"Source: {article['source']}")
-        lines.append(article['summary'])
-        lines.append(f"URL: {article['url']}")
-        lines.append("")
-    
-    return "\n".join(lines)
+    return articles_to_show[:max_results]

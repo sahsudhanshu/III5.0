@@ -22,6 +22,7 @@ import {
   Search, Bell, Sun, Moon, Bot, TrendingUp, TrendingDown,
   ChevronDown, X, Settings, LogOut, Loader2, Sparkles, User as UserIcon
 } from "lucide-react";
+import { useRequireAuth } from "@/hooks/use-require-auth";
 
 // ── Primary nav items (Groww style) ──
 const NAV_ITEMS = [
@@ -247,6 +248,7 @@ export function Navbar() {
   const { data: session } = useSession();
   const user = session?.user;
   const { toggleChat } = useChatStore();
+  const { requireAuth } = useRequireAuth();
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => { setTimeout(() => setMounted(true), 0); }, []);
@@ -279,7 +281,7 @@ export function Navbar() {
         <div className="flex items-center gap-1 flex-shrink-0">
           {/* AI Assistant */}
           <button
-            onClick={toggleChat}
+            onClick={() => requireAuth(toggleChat)}
             className="relative flex items-center justify-center w-8 h-8 rounded-lg hover:bg-muted transition-colors"
             title="AI Assistant"
           >

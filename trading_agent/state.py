@@ -21,6 +21,7 @@ class AgentState(TypedDict, total=False):
     # Messages
     messages: List[BaseMessage]
     human_input: str
+    page_context: Optional[str]  # current page context from frontend
 
     # User location (GPS from browser)
     latitude: Optional[float]

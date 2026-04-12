@@ -1,4 +1,5 @@
 "use client";
+import { useEffect } from "react";
 import { create } from "zustand";
 import type { ChatMessage } from "@/types";
 import { generateId } from "@/lib/utils";
@@ -10,6 +11,7 @@ interface ChatState {
   context: string | null;
 
   openChat: () => void;
+  openChatWithContext: (context: string) => void;
   closeChat: () => void;
   toggleChat: () => void;
   sendMessage: (content: string) => Promise<void>;
@@ -66,7 +68,8 @@ export const useChatStore = create<ChatState>()((set, get) => ({
   context: null,
 
   openChat: () => set({ isOpen: true }),
-  closeChat: () => set({ isOpen: false }),
+  openChatWithContext: (context) => set({ isOpen: true, context }),
+  closeChat: () => set({ isOpen: false, context: null }),
   toggleChat: () => set((s) => ({ isOpen: !s.isOpen })),
 
   sendMessage: async (content) => {
@@ -123,3 +126,22 @@ export const useChatStore = create<ChatState>()((set, get) => ({
 
   clearMessages: () => set({ messages: [GREETING] }),
 }));
+
+/**
+ * useChatContext — call this in any page component to automatically register
+ * a context string that Aria will receive alongside every chat message.
+ * Context is cleared automatically when the component unmounts (i.e. user navigates away).
+ * If context is null/undefined, no context is set.
+ */
+export function useChatContext(context: string | null | undefined) {
+  const setContext = useChatStore((s) => s.setContext);
+  useEffect(() => {
+    if (context) {
+      setContext(context);
+    }
+    return () => {
+      // Only clear if this page "owns" the context (still matches what we set)
+      setContext(null);
+    };
+  }, [context, setContext]);
+}

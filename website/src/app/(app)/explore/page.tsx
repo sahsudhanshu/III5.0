@@ -1,7 +1,7 @@
 "use client";
 import React, { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { MOCK_NEWS } from "@/lib/mock-data";
+
 import { formatCurrency, formatPercent, cn, formatNumber } from "@/lib/utils";
 import {
   TrendingUp, TrendingDown, ChevronRight, Flame, Star,
@@ -9,11 +9,13 @@ import {
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { AreaChart, Area, ResponsiveContainer } from "recharts";
-import { generateCandlestickData } from "@/lib/mock-data"; 
+import { generateCandlestickData } from "@/lib/mock-data";
 import { useWatchlistStore } from "@/store/watchlist-store";
 import { useDataStore, INITIAL_UNIVERSE } from "@/store/data-store";
 import { toast } from "sonner";
 import type { Stock } from "@/types";
+import { useNews } from "@/store/news-store";
+import { useChatContext } from "@/store/chat-store";
 
 // ── Sparkline ──
 // We'll keep dynamic simulated sparklines for dashboards to avoid pulling 5x daily candles APIs 
@@ -21,8 +23,9 @@ import type { Stock } from "@/types";
 function Sparkline({ symbol, positive }: { symbol: string; positive: boolean }) {
   const data = React.useMemo(() => {
     const hash = symbol.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0);
-    // Stable pseudo-random generation based on symbol hash to strictly obey React purity rules
-    return generateCandlestickData(100 + (hash % 900), 15, "1W").map((d) => ({
+    // Seeded generation — symbol is passed as 4th arg so the PRNG is seeded per-stock,
+    // giving each stock its own unique but stable sparkline on every reload.
+    return generateCandlestickData(100 + (hash % 900), 15, "1W", symbol).map((d) => ({
       v: d.close,
     }));
   }, [symbol]);
@@ -30,7 +33,7 @@ function Sparkline({ symbol, positive }: { symbol: string; positive: boolean }) 
   const fillColor = positive ? "#00d09c" : "#eb5b3c";
   const safeSymbolId = symbol.toLowerCase().replace(/[^a-z0-9-_]/g, "-");
   const gradientId = `sparkline-${safeSymbolId}-${positive ? "up" : "down"}`;
-  
+
   return (
     <ResponsiveContainer width={72} height={36}>
       <AreaChart data={data} margin={{ top: 2, right: 2, bottom: 2, left: 2 }}>
@@ -48,11 +51,11 @@ function Sparkline({ symbol, positive }: { symbol: string; positive: boolean }) 
 
 // ── Index Card ──
 const INDICES = [
-  { name: "S&P 500",   value: 5280.2,  change: 0.62  },
-  { name: "NASDAQ",     value: 16920.5,  change: 0.88  },
-  { name: "DOW JONES", value: 39230.1,  change: 0.14  },
-  { name: "RUSSELL 2k",   value: 2050.8,  change: -0.42 },
-  { name: "VIX",  value: 14.6,  change: -5.12  },
+  { name: "S&P 500", value: 5280.2, change: 0.62 },
+  { name: "NASDAQ", value: 16920.5, change: 0.88 },
+  { name: "DOW JONES", value: 39230.1, change: 0.14 },
+  { name: "RUSSELL 2k", value: 2050.8, change: -0.42 },
+  { name: "VIX", value: 14.6, change: -5.12 },
 ];
 
 function IndexCard({ name, value, change }: { name: string; value: number; change: number }) {
@@ -161,26 +164,26 @@ const SECTOR_FILTER_MAP: Record<string, string[]> = {
 export default function ExplorePage() {
   const router = useRouter();
   const [activeSection, setActiveSection] = useState("All");
-  
+
   const { stocks, fetchStockProfile } = useDataStore();
   const [loading, setLoading] = useState(true);
+
+  // Live news via Zustand store
+  const { articles: marketNews, loading: loadingNews } = useNews("market", 4);
+
+  // Register page context for Aria chatbot
+  useChatContext("User is browsing the stock explorer page.");
 
   // Load the initial universe of stocks
   useEffect(() => {
     async function loadUniverse() {
-      // Execute in parallel but stagger slightly if needed to avoid overwhelming rate limit.
-      // E.g. batch them 3 by 3, but for 10 we might be ok doing Promise.all
-      // However to be extremely safe against 429:
       setLoading(true);
       for (const symbol of INITIAL_UNIVERSE) {
         await fetchStockProfile(symbol);
-        // Small delay
-        await new Promise(r => setTimeout(r, 100)); // 100ms
+        await new Promise(r => setTimeout(r, 50));
       }
       setLoading(false);
     }
-    
-    // We only fetch if they aren't all already in store
     const missing = INITIAL_UNIVERSE.some(sym => !stocks[sym]);
     if (missing) {
       loadUniverse();
@@ -189,22 +192,21 @@ export default function ExplorePage() {
     }
   }, [fetchStockProfile, stocks]);
 
-  // Derived lists
   const availableStocks = INITIAL_UNIVERSE.map(s => stocks[s]).filter(Boolean);
-  
+
   // Filter stocks based on selected sector
-  const filteredStocks = activeSection === "All" 
-    ? availableStocks 
-    : availableStocks.filter(s => 
-        SECTOR_FILTER_MAP[activeSection]?.some(sectorKeyword => 
-          s.sector.toLowerCase().includes(sectorKeyword.toLowerCase())
-        )
-      );
-  
-  const gainers   = [...filteredStocks].sort((a, b) => b.changePercent - a.changePercent).slice(0, 5);
-  const losers    = [...filteredStocks].sort((a, b) => a.changePercent - b.changePercent).slice(0, 5);
+  const filteredStocks = activeSection === "All"
+    ? availableStocks
+    : availableStocks.filter(s =>
+      SECTOR_FILTER_MAP[activeSection]?.some(sectorKeyword =>
+        s.sector.toLowerCase().includes(sectorKeyword.toLowerCase())
+      )
+    );
+
+  const gainers = [...filteredStocks].sort((a, b) => b.changePercent - a.changePercent).slice(0, 5);
+  const losers = [...filteredStocks].sort((a, b) => a.changePercent - b.changePercent).slice(0, 5);
   // Real volume from free Finnhub quote 'v' doesn't exist, we will use mock logic or fall back
-  const momentum  = [...filteredStocks].sort((a, b) => Math.abs(b.change) - Math.abs(a.change)).slice(0, 5); 
+  const momentum = [...filteredStocks].sort((a, b) => Math.abs(b.change) - Math.abs(a.change)).slice(0, 5);
 
   const FILTERS = ["All", "Tech", "Finance", "Energy", "Retail", "Healthcare"];
 
@@ -307,13 +309,13 @@ export default function ExplorePage() {
             <SectionHeader title="Sectors" icon={<BarChart2 className="w-4 h-4 text-primary" />} />
             <div className="space-y-2.5">
               {[
-                { name: "Banking",  change: 0.84,  color: "#00d09c" },
-                { name: "IT",       change: -0.42, color: "#eb5b3c" },
-                { name: "Energy",   change: 1.22,  color: "#00d09c" },
-                { name: "FMCG",     change: -0.56, color: "#eb5b3c" },
-                { name: "Auto",     change: 2.35,  color: "#00d09c" },
-                { name: "Finance",  change: 1.25,  color: "#00d09c" },
-                { name: "Pharma",   change: -0.18, color: "#eb5b3c" },
+                { name: "Banking", change: 0.84, color: "#00d09c" },
+                { name: "IT", change: -0.42, color: "#eb5b3c" },
+                { name: "Energy", change: 1.22, color: "#00d09c" },
+                { name: "FMCG", change: -0.56, color: "#eb5b3c" },
+                { name: "Auto", change: 2.35, color: "#00d09c" },
+                { name: "Finance", change: 1.25, color: "#00d09c" },
+                { name: "Pharma", change: -0.18, color: "#eb5b3c" },
               ].map((sec) => (
                 <div key={sec.name} className="flex items-center gap-2">
                   <span className="text-xs text-muted-foreground w-20 flex-shrink-0">{sec.name}</span>
@@ -342,32 +344,53 @@ export default function ExplorePage() {
               onViewAll={() => router.push("/news")}
             />
             <div className="space-y-3">
-              {MOCK_NEWS.slice(0, 4).map((article) => (
-                <div
-                  key={article.id}
-                  className="group cursor-pointer pb-3 border-b border-border last:border-0 last:pb-0"
-                >
-                  <div className="flex items-center gap-2 mb-1">
-                    <Badge
-                      variant="secondary"
-                      className={cn(
-                        "text-[9px] px-1.5 py-0.5",
-                        article.sentiment === "positive"
-                          ? "bg-bull-muted text-bull"
-                          : article.sentiment === "negative"
-                          ? "bg-bear-muted text-bear"
-                          : "bg-muted text-muted-foreground"
-                      )}
-                    >
-                      {article.sentiment}
-                    </Badge>
-                    <span className="text-[10px] text-muted-foreground">{article.source}</span>
-                  </div>
-                  <p className="text-xs font-semibold text-foreground leading-relaxed group-hover:text-primary transition-colors line-clamp-2">
-                    {article.title}
-                  </p>
+              {loadingNews ? (
+                <div className="space-y-4">
+                  {[1, 2, 3, 4].map(i => (
+                    <div key={i} className="animate-pulse">
+                      <div className="h-3 w-1/4 bg-muted rounded mb-2"></div>
+                      <div className="h-4 w-full bg-muted rounded"></div>
+                    </div>
+                  ))}
                 </div>
-              ))}
+              ) : marketNews.length > 0 ? (
+                marketNews.map((article, idx) => {
+                  const isPositive = article.title.toLowerCase().includes("beat") || article.title.toLowerCase().includes("jump") || article.title.toLowerCase().includes("rally");
+                  const isNegative = article.title.toLowerCase().includes("fall") || article.title.toLowerCase().includes("drop") || article.title.toLowerCase().includes("decline");
+                  const sentiment = isPositive ? "positive" : isNegative ? "negative" : "neutral";
+
+                  return (
+                    <div
+                      key={idx}
+                      className="group cursor-pointer pb-3 border-b border-border last:border-0 last:pb-0"
+                      onClick={() => article.url ? window.open(article.url, "_blank") : null}
+                    >
+                      <div className="flex items-center gap-2 mb-1">
+                        <Badge
+                          variant="secondary"
+                          className={cn(
+                            "text-[9px] px-1.5 py-0.5",
+                            sentiment === "positive"
+                              ? "bg-bull-muted text-bull"
+                              : sentiment === "negative"
+                                ? "bg-bear-muted text-bear"
+                                : "bg-muted text-muted-foreground"
+                          )}
+                        >
+                          {sentiment}
+                        </Badge>
+                        <span className="text-[10px] text-muted-foreground">{article.source}</span>
+                        {article.published && <span className="text-[9px] text-muted-foreground/70 ml-auto">{article.published}</span>}
+                      </div>
+                      <p className="text-xs font-semibold text-foreground leading-relaxed group-hover:text-primary transition-colors line-clamp-2">
+                        {article.title}
+                      </p>
+                    </div>
+                  );
+                })
+              ) : (
+                <p className="text-xs text-muted-foreground">No recent news found.</p>
+              )}
             </div>
           </div>
 

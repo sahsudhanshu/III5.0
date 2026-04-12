@@ -2,7 +2,6 @@
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useState, useEffect, useRef } from "react";
-import { useTheme } from "next-themes";
 import { cn, formatCurrency, formatPercent } from "@/lib/utils";
 import { useSession, signOut } from "next-auth/react";
 import { useMarketStore } from "@/store/market-store";
@@ -19,10 +18,11 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { useDataStore, INITIAL_UNIVERSE } from "@/store/data-store";
 import {
-  Search, Bell, Sun, Moon, Bot, TrendingUp, TrendingDown,
-  ChevronDown, X, Settings, LogOut, Loader2, Sparkles, User as UserIcon
+  Search, Bell, Sun, Moon, Bot,
+  ChevronDown, X
 } from "lucide-react";
 import { useRequireAuth } from "@/hooks/use-require-auth";
+import { useAppTheme } from "@/hooks/use-app-theme";
 
 // ── Primary nav items (Groww style) ──
 const NAV_ITEMS = [
@@ -49,19 +49,6 @@ function GrowwLogo() {
 }
 
 // ── Search bar (inline input with live suggestions) ──
-const EXTRA_SUGGESTIONS = [
-  { symbol: "SPY", name: "SPDR S&P 500 ETF Trust", type: "ETF" },
-  { symbol: "QQQ", name: "Invesco QQQ Trust (Nasdaq 100)", type: "ETF" },
-  { symbol: "VTI", name: "Vanguard Total Stock Market ETF", type: "ETF" },
-  { symbol: "GLD", name: "SPDR Gold Shares ETF", type: "ETF" },
-  { symbol: "BTC", name: "Bitcoin / USD", type: "Crypto" },
-  { symbol: "ETH", name: "Ethereum / USD", type: "Crypto" },
-  { symbol: "DIA", name: "SPDR Dow Jones Industrial ETF", type: "ETF" },
-  { symbol: "IWM", name: "iShares Russell 2000 ETF", type: "ETF" },
-  { symbol: "ARKK", name: "ARK Innovation ETF", type: "ETF" },
-  { symbol: "XLF", name: "Financial Select Sector SPDR", type: "ETF" },
-];
-
 function SearchBar() {
   const router = useRouter();
   const [query, setQuery] = useState("");
@@ -249,7 +236,7 @@ function MarketTicker() {
 export function Navbar() {
   const pathname = usePathname();
   const router = useRouter();
-  const { theme, setTheme } = useTheme();
+  const { theme, setTheme } = useAppTheme();
   const { data: session, status } = useSession();
   const user = session?.user;
   const { toggleChat } = useChatStore();

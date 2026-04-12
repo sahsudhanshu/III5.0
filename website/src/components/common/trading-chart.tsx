@@ -11,7 +11,7 @@ import {
   AreaSeries,
   HistogramSeries,
 } from "lightweight-charts";
-import { useTheme } from "next-themes";
+import { useAppTheme } from "@/hooks/use-app-theme";
 import type { CandlestickDataPoint } from "@/types";
 import {
   Bot,
@@ -76,7 +76,7 @@ export function TradingChart({
   const volumeSeriesRef = useRef<ISeriesApi<"Histogram"> | null>(null);
   const formattedDataRef = useRef<(CandlestickDataPoint & { time: number })[]>([]);
 
-  const { resolvedTheme } = useTheme();
+  const { resolvedTheme } = useAppTheme();
   const [popover, setPopover] = useState<PopoverState>({
     visible: false,
     x: 0,

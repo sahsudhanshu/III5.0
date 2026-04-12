@@ -82,7 +82,7 @@ export default function WatchlistPage() {
           onClick={() => requireAuth(() => {}, "Sign in to view and manage your watchlist")}
           className="px-6 py-3 bg-primary text-primary-foreground font-bold rounded-xl shadow-[0_0_20px_rgba(0,208,156,0.2)] hover:shadow-[0_0_30px_rgba(0,208,156,0.4)] transition-all"
         >
-          Authenticate & Build Watchlist
+          Sign in & Build Watchlist
         </button>
       </div>
     );

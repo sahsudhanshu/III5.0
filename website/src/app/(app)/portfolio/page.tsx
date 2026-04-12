@@ -1,6 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 "use client";
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useMemo } from "react";
 import { usePortfolioStore } from "@/store/portfolio-store";
 import { useMarketStore } from "@/store/market-store";
 import { useRequireAuth } from "@/hooks/use-require-auth";
@@ -12,9 +12,20 @@ import {
   ResponsiveContainer,
 } from "recharts";
 import { toast } from "sonner";
-import { generatePortfolioHistory } from "@/lib/mock-data";
 
-const HISTORY_1Y = generatePortfolioHistory(365);
+function buildFlatPortfolioHistory(currentValue: number, days = 365) {
+  const today = new Date();
+  const normalized = Number.isFinite(currentValue) ? Math.max(0, currentValue) : 0;
+
+  return Array.from({ length: days }, (_, i) => {
+    const date = new Date(today);
+    date.setDate(today.getDate() - (days - 1 - i));
+    return {
+      date: date.toISOString().split("T")[0],
+      value: parseFloat(normalized.toFixed(2)),
+    };
+  });
+}
 
 // ── Funds Modal ─────────────────────────────────────────────────
 function FundsModal({
@@ -110,13 +121,6 @@ export default function PortfolioPage() {
     }
   }, [prices, portfolio?.holdings?.length, enrichWithPrices, priceMap]);
 
-  const chartData = {
-    "1W": HISTORY_1Y.slice(-7),
-    "1M": HISTORY_1Y.slice(-30),
-    "3M": HISTORY_1Y.slice(-90),
-    "6M": HISTORY_1Y.slice(-180),
-  }[timeRange] ?? HISTORY_1Y.slice(-90);
-
   // ── Computed Stats ───────────────────────────────────────────
   const cashBalance = portfolio?.cashBalance ?? 0;
   const totalInvested = portfolio?.holdings?.reduce((s, h) => s + (h.investedValue ?? h.avgBuyPrice * h.qty), 0) ?? 0;
@@ -124,6 +128,80 @@ export default function PortfolioPage() {
   const totalPnL = totalCurrentValue - totalInvested;
   const totalPnLPct = totalInvested > 0 ? (totalPnL / totalInvested) * 100 : 0;
   const totalPortfolioValue = cashBalance + totalCurrentValue;
+  const hasPortfolioActivity =
+    (portfolio?.holdings?.length ?? 0) > 0 ||
+    (portfolio?.transactions?.length ?? 0) > 0;
+
+  const activityStartDate = useMemo(() => {
+    const timestamps = (portfolio?.transactions ?? [])
+      .map((t) => new Date(t.timestamp).getTime())
+      .filter((n) => Number.isFinite(n));
+
+    if (timestamps.length > 0) {
+      const first = new Date(Math.min(...timestamps));
+      first.setHours(0, 0, 0, 0);
+      return first;
+    }
+
+    if ((portfolio?.holdings?.length ?? 0) > 0) {
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      return today;
+    }
+
+    return null;
+  }, [portfolio?.transactions, portfolio?.holdings?.length]);
+
+  const history1Y = useMemo(() => {
+    if (!hasPortfolioActivity || !activityStartDate) return [];
+
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const days = Math.max(1, Math.floor((today.getTime() - activityStartDate.getTime()) / 86400000) + 1);
+    return buildFlatPortfolioHistory(totalPortfolioValue, days);
+  }, [hasPortfolioActivity, activityStartDate, totalPortfolioValue]);
+
+  const chartData = hasPortfolioActivity ? ({
+    "1W": history1Y.slice(-7),
+    "1M": history1Y.slice(-30),
+    "3M": history1Y.slice(-90),
+    "6M": history1Y.slice(-180),
+  }[timeRange] ?? history1Y.slice(-90)) : [];
+  const xTickInterval = useMemo(() => {
+    switch (timeRange) {
+      case "1W":
+        return 0;
+      case "1M":
+        return 4;
+      case "3M":
+        return 10;
+      case "6M":
+        return 20;
+      default:
+        return Math.max(1, Math.floor(chartData.length / 8));
+    }
+  }, [timeRange, chartData.length]);
+
+  const formatTimelineTick = useCallback((value: string) => {
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return value;
+
+    if (timeRange === "1W") {
+      return date.toLocaleDateString("en-US", { weekday: "short" });
+    }
+
+    if (timeRange === "6M") {
+      return date.toLocaleDateString("en-US", { day: "numeric", month: "short" });
+    }
+
+    return date.toLocaleDateString("en-US", { day: "numeric", month: "short" });
+  }, [timeRange]);
+
+  const formatTooltipDate = useCallback((value: any) => {
+    const date = new Date(String(value));
+    if (Number.isNaN(date.getTime())) return value;
+    return date.toLocaleDateString("en-US", { year: "numeric", month: "short", day: "numeric" });
+  }, []);
 
   const handleFundsConfirm = async (amount: number) => {
     if (!fundsModal) return;
@@ -148,7 +226,7 @@ export default function PortfolioPage() {
           onClick={() => requireAuth(() => {}, "Sign in to view and manage your portfolio")}
           className="px-6 py-3 bg-primary text-primary-foreground font-bold rounded-xl shadow-[0_0_20px_rgba(0,208,156,0.2)] hover:shadow-[0_0_30px_rgba(0,208,156,0.4)] transition-all"
         >
-          Authenticate to View
+          Sign in to view
         </button>
       </div>
     );
@@ -239,6 +317,11 @@ export default function PortfolioPage() {
             ))}
           </div>
         </div>
+        {!hasPortfolioActivity && (
+          <p className="text-xs text-muted-foreground mb-3">
+            No portfolio activity yet. The chart will update after you add funds or place your first trade.
+          </p>
+        )}
         <ResponsiveContainer width="100%" height={200}>
           <AreaChart data={chartData}>
             <defs>
@@ -248,9 +331,21 @@ export default function PortfolioPage() {
               </linearGradient>
             </defs>
             <CartesianGrid strokeDasharray="3 3" className="opacity-10" vertical={false} />
-            <XAxis dataKey="date" tickFormatter={(v) => { const d = new Date(v); return `${d.getDate()}/${d.getMonth()+1}`; }} tick={{ fontSize: 10 }} axisLine={false} tickLine={false} interval="preserveStartEnd" />
+            <XAxis
+              dataKey="date"
+              tickFormatter={formatTimelineTick}
+              tick={{ fontSize: 10 }}
+              axisLine={false}
+              tickLine={false}
+              interval={xTickInterval}
+              minTickGap={20}
+            />
             <YAxis tickFormatter={(v) => `$${(v/1000).toFixed(0)}k`} tick={{ fontSize: 10 }} axisLine={false} tickLine={false} width={50} />
-            <Tooltip formatter={(v: any) => [formatCurrency(v), "Value"]} contentStyle={{ background: "var(--card)", border: "1px solid var(--border)", borderRadius: "8px", fontSize: "12px" }} />
+            <Tooltip
+              labelFormatter={formatTooltipDate}
+              formatter={(v: any) => [formatCurrency(v), "Value"]}
+              contentStyle={{ background: "var(--card)", border: "1px solid var(--border)", borderRadius: "8px", fontSize: "12px" }}
+            />
             <Area type="monotone" dataKey="value" stroke="oklch(0.65 0.18 151)" strokeWidth={2} fill="url(#grad)" dot={false} />
           </AreaChart>
         </ResponsiveContainer>

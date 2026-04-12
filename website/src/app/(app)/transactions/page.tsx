@@ -93,7 +93,7 @@ export default function TransactionsPage() {
           <p className="text-sm text-muted-foreground mt-2 mb-6">
             Sign in to view your order history, P&amp;L activity, deposits, and withdrawals.
           </p>
-          <Button onClick={() => requireAuth(() => {}, "Sign in to view your transaction history")}>Authenticate to Continue</Button>
+          <Button onClick={() => requireAuth(() => {}, "Sign in to view your transaction history")}>Sign in to view</Button>
         </div>
       </div>
     );

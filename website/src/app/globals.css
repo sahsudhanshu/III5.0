@@ -188,7 +188,7 @@
   }
   html {
     @apply font-sans;
-    font-size: clamp(16px, 0.35vw + 15px, 18px);
+    font-size: clamp(17px, 0.45vw + 15.5px, 19px);
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
     font-feature-settings: "cv02","cv03","cv04","cv11";

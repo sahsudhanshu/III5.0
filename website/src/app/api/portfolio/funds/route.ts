@@ -16,12 +16,13 @@ export async function POST(req: Request) {
   }
 
   const { type, amount } = await req.json();
-  const normalizedType = String(type ?? "").toUpperCase();
+  const normalizedTypeRaw = String(type ?? "").toUpperCase();
   const amountNum = Number(amount);
 
-  if (!["DEPOSIT", "WITHDRAW"].includes(normalizedType)) {
+  if (!["DEPOSIT", "WITHDRAW"].includes(normalizedTypeRaw)) {
     return NextResponse.json({ message: "Invalid type. Must be DEPOSIT or WITHDRAW." }, { status: 400 });
   }
+  const normalizedType = normalizedTypeRaw as "DEPOSIT" | "WITHDRAW";
   if (!Number.isFinite(amountNum) || amountNum < MIN_AMOUNT) {
     return NextResponse.json({ message: `Minimum amount is $${MIN_AMOUNT}` }, { status: 400 });
   }

@@ -1,6 +1,5 @@
 "use client";
 import { Bell, Search, Sun, Moon, Bot, TrendingUp, TrendingDown } from "lucide-react";
-import { useTheme } from "next-themes";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import {
@@ -15,13 +14,14 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { useChatStore } from "@/store/chat-store";
 import { useAuthStore } from "@/store/auth-store";
+import { useAppTheme } from "@/hooks/use-app-theme";
 import { TICKER_STOCKS } from "@/lib/mock-data";
 import { cn, formatCurrency, formatPercent } from "@/lib/utils";
 import { useRouter } from "next/navigation";
 import { useState, useEffect } from "react";
 
 export function Topbar() {
-  const { theme, setTheme } = useTheme();
+  const { theme, setTheme } = useAppTheme();
   const { toggleChat } = useChatStore();
   const { user, logout } = useAuthStore();
   const router = useRouter();

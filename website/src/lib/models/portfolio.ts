@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
 import mongoose, { Schema, Document } from "mongoose";
 
 // ── Sub-documents ──────────────────────────────────────────────
@@ -28,7 +27,7 @@ export interface ITransaction {
 // ── Main Portfolio Document ─────────────────────────────────────
 
 export interface IPortfolio extends Document {
-  userId: mongoose.Types.ObjectId;
+  userId: string;
   cashBalance: number;
   holdings: IHolding[];
   transactions: ITransaction[];
@@ -66,16 +65,24 @@ const TransactionSchema = new Schema<ITransaction>(
 
 const PortfolioSchema = new Schema<IPortfolio>(
   {
-    userId:       { type: Schema.Types.ObjectId, ref: "User", required: true, unique: true, index: true },
-    cashBalance:  { type: Number, default: 10000, min: 0 },
+    userId:       { type: String, required: true, unique: true, index: true },
+    cashBalance:  { type: Number, default: 0, min: 0 },
     holdings:     { type: [HoldingSchema], default: [] },
     transactions: { type: [TransactionSchema], default: [] },
   },
   { timestamps: true }
 );
 
+const existingPortfolioModel = mongoose.models.Portfolio as mongoose.Model<IPortfolio> | undefined;
+if (existingPortfolioModel) {
+  const userIdPath = existingPortfolioModel.schema.path("userId");
+  if (userIdPath?.instance !== "String") {
+    delete mongoose.models.Portfolio;
+  }
+}
+
 const Portfolio =
-  mongoose.models.Portfolio ||
+  (mongoose.models.Portfolio as mongoose.Model<IPortfolio> | undefined) ||
   mongoose.model<IPortfolio>("Portfolio", PortfolioSchema);
 
 export default Portfolio;

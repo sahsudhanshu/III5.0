@@ -1,7 +1,7 @@
 "use client";
 import { useChatStore } from "@/store/chat-store";
 import { cn } from "@/lib/utils";
-import { X, Send, Activity, Terminal, RefreshCw, Command } from "lucide-react";
+import { X, Activity, Terminal, RefreshCw, Command } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useState, useRef, useEffect } from "react";
 import { motion } from "framer-motion";

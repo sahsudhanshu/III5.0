@@ -3,7 +3,7 @@ import { useState, useEffect } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { signIn } from "next-auth/react";
-import { Eye, EyeOff, Activity } from "lucide-react";
+import { Eye, EyeOff, Activity, X } from "lucide-react";
 import { toast } from "sonner";
 import { useAuthModalStore } from "@/store/auth-modal-store";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
@@ -63,12 +63,26 @@ export function AuthModal() {
   };
 
   return (
-    <Dialog open={isOpen} onOpenChange={closeModal}>
+    <Dialog
+      open={isOpen}
+      onOpenChange={(open) => {
+        if (!open) closeModal();
+      }}
+    >
       <DialogContent className="max-w-[400px] p-0 border-none bg-transparent shadow-none [&>button]:hidden sm:rounded-3xl">
-        <DialogTitle className="sr-only">Authenticate to continue</DialogTitle>
+        <DialogTitle className="sr-only">Sign in to view</DialogTitle>
         <div className="relative w-full p-8 sm:p-10 rounded-[2rem] overflow-hidden">
-          {/* Glassmorphism Container */}
+          
           <div className="absolute inset-0 bg-[#050914]/90 backdrop-blur-3xl border border-white/[0.08] shadow-[0_0_80px_rgba(0,0,0,0.8)] -z-10" />
+
+          <button
+            type="button"
+            aria-label="Close authentication modal"
+            onClick={closeModal}
+            className="absolute top-4 right-4 z-20 h-9 w-9 rounded-full bg-black/50 border border-white/20 text-white/85 hover:text-white hover:bg-black/70 hover:border-white/35 transition-colors flex items-center justify-center"
+          >
+            <X className="w-4 h-4" />
+          </button>
           
           <div className="absolute top-[-20%] left-[-10%] w-[50%] h-[50%] rounded-full bg-primary/20 blur-[130px] mix-blend-screen animate-pulse pointer-events-none" />
 
@@ -159,7 +173,7 @@ export function AuthModal() {
                 <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335" />
               </svg>
             </div>
-            Google SSO
+            Google
           </button>
 
           <p className="text-center text-[11px] text-white/45 mt-4">
@@ -173,12 +187,6 @@ export function AuthModal() {
             </Link>
           </p>
           
-          <div className="absolute top-4 right-4 animate-pulse">
-            <span className="flex h-2 w-2">
-               <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-primary opacity-75"></span>
-               <span className="relative inline-flex rounded-full h-2 w-2 bg-primary"></span>
-            </span>
-          </div>
         </div>
       </DialogContent>
     </Dialog>

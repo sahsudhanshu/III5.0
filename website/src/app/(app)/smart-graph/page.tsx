@@ -1,7 +1,7 @@
 'use client';
 
 import dynamic from 'next/dynamic';
-import { Bot, LineChart } from 'lucide-react';
+import { LineChart } from 'lucide-react';
 import { Card } from '@/components/ui/card';
 
 const SmartGraphMap = dynamic(() => import('@/components/SmartGraph'), { ssr: false, loading: () => <div className="h-[800px] w-full flex items-center justify-center animate-pulse bg-slate-100 dark:bg-slate-800 rounded-xl">Loading Graph Engine...</div> });

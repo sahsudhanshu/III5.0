@@ -4,16 +4,31 @@ import { useEffect, useState, useRef } from 'react';
 import cytoscape from 'cytoscape';
 import CytoscapeComponent from 'react-cytoscapejs';
 import { Card } from '@/components/ui/card'; // fallback if exists, or standard div
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+
+type GraphNodeData = {
+  label?: string;
+  ticker?: string;
+  name?: string;
+  source?: string;
+  snippet?: string;
+  sentiment?: string;
+  current_price?: number;
+  momentum?: number;
+  sma_50?: number;
+  sma_200?: number;
+  macd?: number;
+  rsi?: number;
+  sector?: string;
+  industry?: string;
+};
 
 export default function SmartGraph() {
-  const [elements, setElements] = useState([]);
+  const [elements, setElements] = useState<cytoscape.ElementDefinition[]>([]);
   const [loading, setLoading] = useState(true);
   const [isBuilding, setIsBuilding] = useState(false);
   const [inputTickers, setInputTickers] = useState('');
   const [filter, setFilter] = useState('All');
-  const [hoverData, setHoverData] = useState<any | null>(null);
-  const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
+  const [hoverData, setHoverData] = useState<GraphNodeData | null>(null);
   const cyRef = useRef<cytoscape.Core | null>(null);
 
   const fetchGraphData = () => {
@@ -196,7 +211,6 @@ export default function SmartGraph() {
             value={filter} 
             onChange={(e) => {
               setFilter(e.target.value);
-              setSelectedNodeId(null);
               if (cyRef.current) {
                 const cy = cyRef.current;
                 cy.elements().removeClass('dimmed').show();
@@ -286,7 +300,6 @@ export default function SmartGraph() {
           
           cy.on('tap', 'node', (event) => {
             const node = event.target;
-            setSelectedNodeId(node.id());
             
             // Expand node relations visually
             cy.elements().removeClass('dimmed').show();
@@ -307,7 +320,6 @@ export default function SmartGraph() {
           // Click background to reset
           cy.on('tap', (event) => {
             if (event.target === cy) {
-               setSelectedNodeId(null);
                cy.elements().removeClass('dimmed').show();
                // Reapply global filters
                if (filter === 'PositiveNews') {

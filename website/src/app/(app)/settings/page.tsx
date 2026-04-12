@@ -2,13 +2,13 @@
 import { useSession } from "next-auth/react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { useTheme } from "next-themes";
+import { useAppTheme } from "@/hooks/use-app-theme";
 import { Sun, Moon, User, Shield } from "lucide-react";
 
 export default function SettingsPage() {
   const { data: session } = useSession();
   const user = session?.user;
-  const { theme, setTheme } = useTheme();
+  const { theme, setTheme } = useAppTheme();
 
   return (
     <div className="p-6 space-y-6 max-w-2xl">
@@ -43,7 +43,7 @@ export default function SettingsPage() {
           <h2 className="font-semibold">Appearance</h2>
         </div>
         <div className="flex gap-3">
-          {["light", "dark"].map((t) => (
+          {(["light", "dark"] as const).map((t) => (
             <button
               key={t}
               onClick={() => setTheme(t)}

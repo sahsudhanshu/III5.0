@@ -116,10 +116,11 @@ export default function StockDetailPage() {
   const holding = portfolio?.holdings?.find(h => h.symbol === targetSymbol);
   const stockContext = stock ? (() => {
     const lines: string[] = [];
+    const industry = (stock as { industry?: string }).industry ?? "N/A";
 
     // ── Basic identity ──
     lines.push(`PAGE: Stock Detail — ${stock.symbol} (${stock.name})`);
-    lines.push(`Exchange: ${stock.exchange} | Sector: ${stock.sector} | Industry: ${stock.industry ?? "N/A"}`);
+    lines.push(`Exchange: ${stock.exchange} | Sector: ${stock.sector} | Industry: ${industry}`);
 
     // ── Price & performance ──
     lines.push(`\nPRICE DATA:`);

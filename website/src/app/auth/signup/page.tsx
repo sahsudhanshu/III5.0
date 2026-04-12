@@ -4,7 +4,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { useState } from "react";
 import { signIn } from "next-auth/react";
 import { Input } from "@/components/ui/input";
-import { DollarSign, Eye, EyeOff, Check } from "lucide-react";
+import { Eye, EyeOff, Check } from "lucide-react";
 import { toast } from "sonner";
 
 const STRENGTH_RULES = [

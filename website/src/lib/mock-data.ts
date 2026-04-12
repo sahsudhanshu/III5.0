@@ -652,9 +652,10 @@ function buildMasterSeries(basePrice: number, symbol: string): CandlestickDataPo
 export function generateCandlestickData(
   basePrice: number,
   count: number,
-  _interval = "1D",
+  interval = "1D",
   symbol = "STOCK"
 ): CandlestickDataPoint[] {
+  void interval;
   const master = buildMasterSeries(basePrice, symbol);
   // Return the last `count` candles so all timeframes share the same tail
   return master.slice(-Math.min(count, master.length));

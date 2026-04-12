@@ -253,32 +253,65 @@ async def fetch_sector_headlines(sector: str, desired_count: int = 50) -> list[s
     Ensures exactly `desired_count` non-empty strings.
     """
     desired_count = max(1, desired_count)
-    queries = [
-        f"{sector} stock market",
-        f"{sector} stocks",
-        f"{sector} finance",
-        sector,
+    # Diversified query buckets to increase polarity variety in retrieved headlines.
+    positive_queries = [
+        f"{sector} stocks rally beat earnings upgrade growth surge",
+        f"{sector} bullish outlook strong demand expansion",
     ]
-    unique: list[str] = []
+    negative_queries = [
+        f"{sector} stocks drop miss earnings downgrade layoffs lawsuit",
+        f"{sector} bearish outlook slowdown risk decline warning",
+    ]
+    neutral_queries = [
+        f"{sector} market update guidance outlook regulation",
+        f"{sector} industry analysis report",
+    ]
+
+    buckets: dict[str, list[str]] = {"positive": [], "negative": [], "neutral": []}
     seen = set()
-    for q in queries:
-        articles = await fetch_gnews(q, max_results=desired_count)
-        for article in articles:
-            title = str(article.get("title", "")).strip()
-            key = title.lower()
-            if title and key not in seen:
-                seen.add(key)
-                unique.append(title)
-            if len(unique) >= desired_count:
-                return unique[:desired_count]
+
+    async def _collect(queries: list[str], bucket_name: str) -> None:
+        for q in queries:
+            articles = await fetch_gnews(q, max_results=max(10, desired_count // 2))
+            for article in articles:
+                title = str(article.get("title", "")).strip()
+                key = title.lower()
+                if title and key not in seen:
+                    seen.add(key)
+                    buckets[bucket_name].append(title)
+                if sum(len(v) for v in buckets.values()) >= desired_count * 2:
+                    return
+
+    await _collect(positive_queries, "positive")
+    await _collect(negative_queries, "negative")
+    await _collect(neutral_queries, "neutral")
+
+    # Rebalance output for variety (~30% pos, 30% neg, 40% neutral)
+    target_pos = max(1, int(desired_count * 0.30))
+    target_neg = max(1, int(desired_count * 0.30))
+    target_neu = max(1, desired_count - target_pos - target_neg)
+
+    selected: list[str] = []
+    selected.extend(buckets["positive"][:target_pos])
+    selected.extend(buckets["negative"][:target_neg])
+    selected.extend(buckets["neutral"][:target_neu])
+
+    # Fill remaining slots from any bucket while preserving deduped order.
+    if len(selected) < desired_count:
+        combined = buckets["positive"] + buckets["negative"] + buckets["neutral"]
+        for title in combined:
+            if title not in selected:
+                selected.append(title)
+            if len(selected) >= desired_count:
+                break
 
     # deterministic fallback filler if providers return fewer than requested
     i = 1
-    while len(unique) < desired_count:
+    while len(selected) < desired_count:
         filler = f"{sector} market update headline {i}"
-        unique.append(filler)
+        selected.append(filler)
         i += 1
-    return unique[:desired_count]
+    return selected[:desired_count]
 
 
 @tool

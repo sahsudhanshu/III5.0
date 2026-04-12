@@ -26,17 +26,21 @@ function Sparkline({ symbol, positive }: { symbol: string; positive: boolean }) 
       v: d.close,
     }));
   }, [symbol]);
-  const color = positive ? "#00d09c" : "#eb5b3c";
+  const strokeColor = positive ? "#00d09c" : "#eb5b3c";
+  const fillColor = positive ? "#00d09c" : "#eb5b3c";
+  const safeSymbolId = symbol.toLowerCase().replace(/[^a-z0-9-_]/g, "-");
+  const gradientId = `sparkline-${safeSymbolId}-${positive ? "up" : "down"}`;
+  
   return (
     <ResponsiveContainer width={72} height={36}>
       <AreaChart data={data} margin={{ top: 2, right: 2, bottom: 2, left: 2 }}>
         <defs>
-          <linearGradient id={`sg-${symbol}`} x1="0" y1="0" x2="0" y2="1">
-            <stop offset="5%" stopColor={color} stopOpacity={0.25} />
-            <stop offset="95%" stopColor={color} stopOpacity={0} />
+          <linearGradient id={gradientId} x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stopColor={fillColor} stopOpacity={0.2} />
+            <stop offset="100%" stopColor={fillColor} stopOpacity={0.02} />
           </linearGradient>
         </defs>
-        <Area type="monotone" dataKey="v" stroke={color} strokeWidth={1.5} fill={`url(#sg-${symbol})`} dot={false} />
+        <Area type="monotone" dataKey="v" stroke={strokeColor} strokeWidth={2} fill={`url(#${gradientId})`} dot={false} isAnimationActive={false} />
       </AreaChart>
     </ResponsiveContainer>
   );
@@ -143,6 +147,16 @@ function SectionHeader({ title, icon, onViewAll }: { title: string; icon?: React
   );
 }
 
+// ── Sector Mapping ──
+const SECTOR_FILTER_MAP: Record<string, string[]> = {
+  "All": [],
+  "Tech": ["Technology", "Software"],
+  "Finance": ["Financials", "Banking"],
+  "Energy": ["Energy", "Oil & Gas"],
+  "Retail": ["Consumer Cyclical", "Retail"],
+  "Healthcare": ["Healthcare", "Pharma", "Biotechnology"],
+};
+
 // ── Main Explore Page ──
 export default function ExplorePage() {
   const router = useRouter();
@@ -178,10 +192,19 @@ export default function ExplorePage() {
   // Derived lists
   const availableStocks = INITIAL_UNIVERSE.map(s => stocks[s]).filter(Boolean);
   
-  const gainers   = [...availableStocks].sort((a, b) => b.changePercent - a.changePercent).slice(0, 5);
-  const losers    = [...availableStocks].sort((a, b) => a.changePercent - b.changePercent).slice(0, 5);
+  // Filter stocks based on selected sector
+  const filteredStocks = activeSection === "All" 
+    ? availableStocks 
+    : availableStocks.filter(s => 
+        SECTOR_FILTER_MAP[activeSection]?.some(sectorKeyword => 
+          s.sector.toLowerCase().includes(sectorKeyword.toLowerCase())
+        )
+      );
+  
+  const gainers   = [...filteredStocks].sort((a, b) => b.changePercent - a.changePercent).slice(0, 5);
+  const losers    = [...filteredStocks].sort((a, b) => a.changePercent - b.changePercent).slice(0, 5);
   // Real volume from free Finnhub quote 'v' doesn't exist, we will use mock logic or fall back
-  const momentum  = [...availableStocks].sort((a, b) => Math.abs(b.change) - Math.abs(a.change)).slice(0, 5); 
+  const momentum  = [...filteredStocks].sort((a, b) => Math.abs(b.change) - Math.abs(a.change)).slice(0, 5); 
 
   const FILTERS = ["All", "Tech", "Finance", "Energy", "Retail", "Healthcare"];
 
@@ -352,7 +375,7 @@ export default function ExplorePage() {
           <div className="groww-card p-4">
             <SectionHeader title="52-Week Highs" icon={<TrendingUp className="w-4 h-4 text-bull" />} />
             <div className="space-y-2">
-              {availableStocks.filter((s) => s.price / s.high52w > 0.92).slice(0, 4).map((s) => (
+              {filteredStocks.filter((s) => s.price / s.high52w > 0.92).slice(0, 4).map((s) => (
                 <div
                   key={s.symbol}
                   className="flex items-center justify-between py-1.5 hover:bg-muted/40 rounded-lg px-1.5 cursor-pointer transition-colors"
@@ -380,7 +403,7 @@ export default function ExplorePage() {
       {/* ── Full All Stocks Table ── */}
       <section className="groww-card p-4">
         <SectionHeader
-          title="All Stocks"
+          title={activeSection === "All" ? "All Stocks" : `${activeSection} Stocks`}
           icon={<BarChart2 className="w-4 h-4 text-primary" />}
         />
         <div className="overflow-x-auto">
@@ -395,7 +418,7 @@ export default function ExplorePage() {
               </tr>
             </thead>
             <tbody>
-              {availableStocks.map((s) => {
+              {filteredStocks.map((s) => {
                 const pos = s.changePercent >= 0;
                 return (
                   <tr

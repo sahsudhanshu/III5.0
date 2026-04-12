@@ -170,7 +170,18 @@ function MarketTicker() {
   // Merge static with live prices
   const displayStocks = INITIAL_UNIVERSE.slice(0, 5).map(symbol => {
     const s = stocks[symbol];
-    if (!s) return null;
+    // Fallback to default data if not loaded yet
+    if (!s) {
+      return {
+        symbol,
+        name: symbol,
+        price: 0,
+        changePercent: 0,
+        currentPrice: 0,
+        isUp: false,
+        live: false
+      };
+    }
     const finnhubSymbol = symbol === "BTC" ? "BINANCE:BTCUSDT" : symbol;
     const live = prices[finnhubSymbol];
     if (live) {
@@ -183,16 +194,16 @@ function MarketTicker() {
   });
 
   return (
-    <div className="hidden xl:flex items-center gap-4 overflow-hidden w-52 flex-shrink-0">
+    <div className="flex items-center gap-4 overflow-hidden w-[32rem] flex-shrink-0">
       <div className="flex items-center gap-4 animate-ticker w-max">
-        {[...displayStocks, ...displayStocks].filter(Boolean).map((s, i) => (
+        {[...displayStocks, ...displayStocks].map((s, i) => (
           <span key={i} className="flex items-center gap-1.5 whitespace-nowrap">
-            <span className="text-[11px] font-semibold text-muted-foreground">{s!.symbol}</span>
+            <span className="text-[11px] font-semibold text-muted-foreground">{s.symbol}</span>
             <span className={cn("text-[11px] font-bold num transition-colors duration-300",
-              s!.live && s!.isUp ? "text-bull" : s!.live && !s!.isUp ? "text-bear" :
-                s!.changePercent >= 0 ? "text-bull" : "text-bear"
+              s.live && s.isUp ? "text-bull" : s.live && !s.isUp ? "text-bear" :
+                s.changePercent >= 0 ? "text-bull" : "text-bear"
             )}>
-              {s!.live ? formatCurrency(s!.currentPrice) : (s!.changePercent >= 0 ? "+" : "") + formatPercent(s!.changePercent)}
+              {s.price > 0 ? (s.live ? formatCurrency(s.currentPrice) : (s.changePercent >= 0 ? "+" : "") + formatPercent(s.changePercent)) : "—"}
             </span>
           </span>
         ))}
@@ -224,11 +235,16 @@ export function Navbar() {
         {/* Logo */}
         <GrowwLogo />
 
-        {/* Ticker */}
-        <MarketTicker />
+        {/* Ticker - increased width */}
+        <div className="hidden md:flex ml-6">
+          <MarketTicker />
+        </div>
 
-        {/* Search — centered */}
-        <div className="flex-1 flex justify-center px-2">
+        {/* Spacer */}
+        <div className="flex-1" />
+
+        {/* Search — right side */}
+        <div className="flex items-center px-2">
           <SearchBar />
         </div>
 

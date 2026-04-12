@@ -20,6 +20,7 @@ import { usePortfolioStore } from "@/store/portfolio-store";
 import { useNews } from "@/store/news-store";
 import { useChatContext } from "@/store/chat-store";
 import { useRequireAuth } from "@/hooks/use-require-auth";
+import { RestrictedOverlay } from "@/components/auth/restricted-overlay";
 
 export default function DashboardPage() {
   const { data: session } = useSession();
@@ -40,8 +41,10 @@ export default function DashboardPage() {
 
 
   useEffect(() => {
-    fetchPortfolio();
-  }, [fetchPortfolio]);
+    if (isAuthenticated) {
+      fetchPortfolio();
+    }
+  }, [fetchPortfolio, isAuthenticated]);
 
   useEffect(() => {
     async function loadUniverse() {
@@ -180,10 +183,10 @@ export default function DashboardPage() {
   const firstName = user?.name?.split(" ")[0] ?? "Investor";
 
   return (
-    <div className="max-w-[1700px] mx-auto px-4 lg:px-6 py-6 space-y-6">
+    <div className="max-w-[1700px] mx-auto px-3 sm:px-4 lg:px-6 py-4 sm:py-6 space-y-5 sm:space-y-6">
 
       {/* ── Welcome ── */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <div>
           <h1 className="text-xl font-bold text-foreground">{greeting}, {firstName} 👋</h1>
           <p className="text-sm text-muted-foreground mt-0.5">Here&apos;s your portfolio snapshot</p>
@@ -194,15 +197,16 @@ export default function DashboardPage() {
       </div>
 
       {/* ── Portfolio Hero Card ── */}
-      <div className="groww-card p-5 relative overflow-hidden">
+      <div className="groww-card p-4 sm:p-5 relative overflow-hidden">
         {!isAuthenticated && (
-          <div className="absolute inset-0 z-10 bg-background/80 backdrop-blur-sm flex flex-col items-center justify-center text-center p-6">
-            <h3 className="font-bold mb-2">Portfolio Overview</h3>
-            <p className="text-sm text-muted-foreground mb-4 max-w-[300px]">Sign in to track your investments and live performance.</p>
-            <button onClick={() => requireAuth(() => {})} className="btn-groww text-xs px-6 py-2 shadow-[0_0_15px_rgba(0,208,156,0.3)]">Authenticate</button>
-          </div>
+          <RestrictedOverlay
+            title="Portfolio Overview"
+            description="Sign in to track your investments and live performance."
+            actionLabel="Sign in to view"
+            onAuthenticate={() => requireAuth(() => {}, "Sign in to view your portfolio performance")}
+          />
         )}
-        <div className={cn("grid grid-cols-1 md:grid-cols-2 gap-6", !isAuthenticated && "opacity-20 pointer-events-none select-none blur-sm")}>
+        <div className={cn("grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6", !isAuthenticated && "opacity-20 pointer-events-none select-none blur-sm")}>
           {/* Left: total value */}
           <div className="space-y-4">
             <div>
@@ -214,7 +218,7 @@ export default function DashboardPage() {
               )}
             </div>
 
-            <div className="flex flex-wrap gap-4">
+            <div className="flex flex-wrap gap-3 sm:gap-4">
               <div>
                 <p className="text-[11px] text-muted-foreground">Total P&L</p>
                 <div className={cn("flex items-center gap-1 font-bold num text-sm", totalPnL >= 0 ? "text-bull" : "text-bear")}>
@@ -240,11 +244,11 @@ export default function DashboardPage() {
             </div>
 
             {/* Quick actions */}
-            <div className="flex gap-2">
-              <button className="btn-groww px-4 py-2 text-xs" onClick={() => router.push("/explore")}>
+            <div className="flex flex-col sm:flex-row gap-2">
+              <button className="btn-groww px-4 py-2 text-xs w-full sm:w-auto" onClick={() => router.push("/explore")}>
                 Buy Stocks
               </button>
-              <button className="px-4 py-2 text-xs rounded-lg border border-border font-semibold hover:bg-muted transition-colors" onClick={() => router.push("/portfolio")}>
+              <button className="px-4 py-2 text-xs rounded-lg border border-border font-semibold hover:bg-muted transition-colors w-full sm:w-auto" onClick={() => router.push("/portfolio")}>
                 View Holdings
               </button>
             </div>
@@ -284,14 +288,17 @@ export default function DashboardPage() {
       </div>
 
       {/* ── 3 columns: Holdings | Movers | Sector ── */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-5">
 
         {/* Holdings */}
-        <div className="groww-card p-4 relative overflow-hidden">
+        <div className="groww-card p-4 relative overflow-hidden min-w-0 min-h-[260px]">
           {!isAuthenticated && (
-            <div className="absolute inset-0 z-10 bg-background/80 backdrop-blur-sm flex flex-col items-center justify-center p-4">
-               <button onClick={() => requireAuth(() => {})} className="px-4 py-2 bg-primary/20 text-primary font-bold text-xs rounded-xl mt-4">Sign in to view</button>
-            </div>
+            <RestrictedOverlay
+              title="Your Holdings"
+              description="Sign in to view holdings, position-level returns, and allocation details."
+              actionLabel="Sign in to view"
+              onAuthenticate={() => requireAuth(() => {}, "Sign in to view your holdings and P&L")}
+            />
           )}
           <div className="flex items-center justify-between mb-3">
             <p className="text-sm font-bold">Your Holdings</p>
@@ -328,7 +335,7 @@ export default function DashboardPage() {
         </div>
 
         {/* Market Movers */}
-        <div className="groww-card p-4">
+        <div className="groww-card p-4 min-w-0 min-h-[260px]">
           <div className="flex items-center justify-between mb-3">
             <p className="text-sm font-bold">Market Movers</p>
             <button onClick={() => router.push("/explore")} className="text-primary text-xs font-semibold flex items-center gap-0.5 hover:underline">
@@ -369,15 +376,17 @@ export default function DashboardPage() {
         </div>
 
         {/* Sector allocation */}
-        <div className="groww-card p-4">
+        <div className="groww-card p-4 min-w-0 min-h-[260px]">
           <p className="text-sm font-bold mb-3">Sector Split</p>
           {sectorAllocation.length > 0 ? (
-          <div className="flex items-center gap-4">
+          <div className="flex flex-col sm:flex-row sm:items-center gap-4">
+            <div className="mx-auto sm:mx-0">
             <PieChart width={100} height={100}>
               <Pie data={sectorAllocation} cx={47} cy={47} innerRadius={28} outerRadius={48} dataKey="percentage" strokeWidth={1}>
                 {sectorAllocation.map((e, i) => <Cell key={i} fill={e.color} />)}
               </Pie>
             </PieChart>
+            </div>
             <div className="flex-1 space-y-1.5">
               {sectorAllocation.map((s) => (
                 <div key={s.sector} className="flex items-center justify-between">
@@ -397,13 +406,16 @@ export default function DashboardPage() {
       </div>
 
       {/* ── Recent Transactions + News ── */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-5">
         {/* Transactions */}
-        <div className="groww-card p-4 relative overflow-hidden">
+        <div className="groww-card p-4 relative overflow-hidden min-w-0 min-h-[240px]">
           {!isAuthenticated && (
-            <div className="absolute inset-0 z-10 bg-background/80 backdrop-blur-sm flex flex-col items-center justify-center p-4">
-               <button onClick={() => requireAuth(() => {})} className="px-4 py-2 bg-primary/20 text-primary font-bold text-xs rounded-xl mt-4">Sign in to view</button>
-            </div>
+            <RestrictedOverlay
+              title="Recent Orders"
+              description="Sign in to view your recent buy/sell activity and transaction timeline."
+              actionLabel="Sign in to view"
+              onAuthenticate={() => requireAuth(() => {}, "Sign in to view your recent orders")}
+            />
           )}
           <div className="flex items-center justify-between mb-3">
             <p className="text-sm font-bold">Recent Orders</p>
@@ -444,7 +456,7 @@ export default function DashboardPage() {
         </div>
 
         {/* News */}
-        <div className="groww-card p-4">
+        <div className="groww-card p-4 min-w-0 min-h-[240px]">
           <div className="flex items-center justify-between mb-3">
             <p className="text-sm font-bold">Market News</p>
             <button onClick={() => router.push("/news")} className="text-primary text-xs font-semibold flex items-center gap-0.5 hover:underline">

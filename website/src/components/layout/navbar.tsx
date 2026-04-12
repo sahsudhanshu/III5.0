@@ -225,7 +225,12 @@ function MarketTicker() {
     <div className="flex items-center gap-4 overflow-hidden w-[32rem] flex-shrink-0">
       <div className="flex items-center gap-4 animate-ticker w-max">
         {[...displayStocks, ...displayStocks].map((s, i) => (
-          <span key={i} className="flex items-center gap-1.5 whitespace-nowrap">
+          <Link
+            key={i}
+            href={`/explore/${s.symbol}`}
+            className="flex items-center gap-1.5 whitespace-nowrap rounded px-1 py-0.5 hover:bg-muted/50 transition-colors"
+            title={`Open ${s.symbol}`}
+          >
             <span className="text-[11px] font-semibold text-muted-foreground">{s.symbol}</span>
             <span className={cn("text-[11px] font-bold num transition-colors duration-300",
               s.live && s.isUp ? "text-bull" : s.live && !s.isUp ? "text-bear" :
@@ -233,7 +238,7 @@ function MarketTicker() {
             )}>
               {s.price > 0 ? (s.live ? formatCurrency(s.currentPrice) : (s.changePercent >= 0 ? "+" : "") + formatPercent(s.changePercent)) : "—"}
             </span>
-          </span>
+          </Link>
         ))}
       </div>
     </div>
@@ -245,7 +250,7 @@ export function Navbar() {
   const pathname = usePathname();
   const router = useRouter();
   const { theme, setTheme } = useTheme();
-  const { data: session } = useSession();
+  const { data: session, status } = useSession();
   const user = session?.user;
   const { toggleChat } = useChatStore();
   const { requireAuth } = useRequireAuth();
@@ -254,7 +259,7 @@ export function Navbar() {
   useEffect(() => { setTimeout(() => setMounted(true), 0); }, []);
 
   const handleLogout = async () => {
-    await signOut({ callbackUrl: "/auth/login" });
+    await signOut({ callbackUrl: "/dashboard" });
   };
 
   return (
@@ -281,7 +286,7 @@ export function Navbar() {
         <div className="flex items-center gap-1 flex-shrink-0">
           {/* AI Assistant */}
           <button
-            onClick={() => requireAuth(toggleChat)}
+            onClick={() => requireAuth(toggleChat, "Sign in to use AI predictions, sentiment, and recommendations")}
             className="relative flex items-center justify-center w-8 h-8 rounded-lg hover:bg-muted transition-colors"
             title="AI Assistant"
           >
@@ -322,8 +327,17 @@ export function Navbar() {
             <DropdownMenuContent align="end" className="w-52">
               <DropdownMenuGroup>
                 <DropdownMenuLabel>
-                  <p className="font-semibold text-foreground text-sm">{user?.name}</p>
-                  <p className="text-xs text-muted-foreground font-normal mt-0.5">{user?.email}</p>
+                  {status === "authenticated" ? (
+                    <>
+                      <p className="font-semibold text-foreground text-sm">{user?.name}</p>
+                      <p className="text-xs text-muted-foreground font-normal mt-0.5">{user?.email}</p>
+                    </>
+                  ) : (
+                    <>
+                      <p className="font-semibold text-foreground text-sm">Guest</p>
+                      <p className="text-xs text-muted-foreground font-normal mt-0.5">Sign in to unlock personalized features</p>
+                    </>
+                  )}
                 </DropdownMenuLabel>
               </DropdownMenuGroup>
               <DropdownMenuSeparator />
@@ -334,9 +348,20 @@ export function Navbar() {
               </DropdownMenuGroup>
               <DropdownMenuSeparator />
               <DropdownMenuGroup>
-                <DropdownMenuItem onClick={handleLogout} className="text-destructive">
-                  Log out
-                </DropdownMenuItem>
+                {status === "authenticated" ? (
+                  <DropdownMenuItem onClick={handleLogout} className="text-destructive">
+                    Log out
+                  </DropdownMenuItem>
+                ) : (
+                  <>
+                    <DropdownMenuItem onClick={() => router.push(`/auth/login?callbackUrl=${encodeURIComponent(pathname)}`)}>
+                      Sign in
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => router.push(`/auth/signup?callbackUrl=${encodeURIComponent(pathname)}`)}>
+                      Create account
+                    </DropdownMenuItem>
+                  </>
+                )}
               </DropdownMenuGroup>
             </DropdownMenuContent>
           </DropdownMenu>

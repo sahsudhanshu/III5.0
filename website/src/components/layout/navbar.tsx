@@ -47,21 +47,50 @@ function GrowwLogo() {
   );
 }
 
-// ── Search dropdown ──
+// ── Search bar (inline input with live suggestions) ──
+const EXTRA_SUGGESTIONS = [
+  { symbol: "SPY", name: "SPDR S&P 500 ETF Trust", type: "ETF" },
+  { symbol: "QQQ", name: "Invesco QQQ Trust (Nasdaq 100)", type: "ETF" },
+  { symbol: "VTI", name: "Vanguard Total Stock Market ETF", type: "ETF" },
+  { symbol: "GLD", name: "SPDR Gold Shares ETF", type: "ETF" },
+  { symbol: "BTC", name: "Bitcoin / USD", type: "Crypto" },
+  { symbol: "ETH", name: "Ethereum / USD", type: "Crypto" },
+  { symbol: "DIA", name: "SPDR Dow Jones Industrial ETF", type: "ETF" },
+  { symbol: "IWM", name: "iShares Russell 2000 ETF", type: "ETF" },
+  { symbol: "ARKK", name: "ARK Innovation ETF", type: "ETF" },
+  { symbol: "XLF", name: "Financial Select Sector SPDR", type: "ETF" },
+];
+
 function SearchBar() {
   const router = useRouter();
-  const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
+  const [open, setOpen] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
 
+  // Close on outside click
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
+        setOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, []);
+
+  // Ctrl+K shortcut
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
       if ((e.metaKey || e.ctrlKey) && e.key === "k") {
         e.preventDefault();
+        inputRef.current?.focus();
         setOpen(true);
-        setTimeout(() => inputRef.current?.focus(), 50);
       }
-      if (e.key === "Escape") setOpen(false);
+      if (e.key === "Escape") {
+        setOpen(false);
+        inputRef.current?.blur();
+      }
     };
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
@@ -70,82 +99,80 @@ function SearchBar() {
   const { stocks } = useDataStore();
   const availableStocks = INITIAL_UNIVERSE.map(s => stocks[s]).filter(Boolean);
 
-  const results = availableStocks.filter(
-    (s) =>
-      s.symbol.toLowerCase().includes(query.toLowerCase()) ||
-      s.name.toLowerCase().includes(query.toLowerCase())
-  ).slice(0, 7);
+  const q = query.toLowerCase();
+
+  const stockResults = availableStocks
+    .filter(s => s.symbol.toLowerCase().includes(q) || s.name.toLowerCase().includes(q))
+    .slice(0, 8)
+    .map(s => ({ symbol: s.symbol, name: s.name, price: s.price, changePercent: s.changePercent }));
+
+  const showSuggestions = open && stockResults.length > 0;
 
   return (
-    <div className="relative w-full max-w-xs lg:max-w-sm xl:max-w-md">
-      {/* Trigger */}
-      <button
-        onClick={() => { setOpen(true); setTimeout(() => inputRef.current?.focus(), 50); }}
-        className="flex items-center gap-2 w-full h-9 px-3 rounded-lg bg-muted text-muted-foreground text-sm hover:bg-muted/80 transition-colors"
-      >
+    <div ref={containerRef} className="relative w-full max-w-xs lg:max-w-sm xl:max-w-md">
+      {/* Inline input */}
+      <div className="flex items-center gap-2 h-9 px-3 rounded-lg bg-muted text-muted-foreground text-sm transition-colors">
         <Search className="w-3.5 h-3.5 flex-shrink-0" />
-        <span className="flex-1 text-left text-xs">Search stocks, ETFs…</span>
-        <kbd className="hidden sm:inline-flex items-center gap-1 text-[10px] bg-background border border-border rounded px-1.5 py-0.5">
-          Ctrl K
-        </kbd>
-      </button>
+        <input
+          ref={inputRef}
+          className="flex-1 bg-transparent text-sm outline-none placeholder:text-muted-foreground text-foreground"
+          placeholder="Search stocks, ETFs…"
+          value={query}
+          onChange={e => { setQuery(e.target.value); setOpen(true); }}
+          onFocus={() => setOpen(true)}
+        />
+        <div className="hidden sm:flex items-center justify-end w-14 flex-shrink-0">
+          {query ? (
+            <button onClick={() => { setQuery(""); inputRef.current?.focus(); }}>
+              <X className="w-3.5 h-3.5 hover:text-foreground transition-colors" />
+            </button>
+          ) : (
+            <kbd className="inline-flex items-center text-[10px] bg-background border border-border rounded px-1.5 py-0.5 pointer-events-none">
+              Ctrl K
+            </kbd>
+          )}
+        </div>
+      </div>
 
-      {/* Dropdown */}
-      {open && (
-        <>
-          <div className="fixed inset-0 z-40" onClick={() => setOpen(false)} />
-          <div className="absolute top-full left-0 right-0 mt-2 bg-card border border-border rounded-xl shadow-2xl z-50 overflow-hidden">
-            <div className="flex items-center gap-2 px-3 py-2.5 border-b border-border">
-              <Search className="w-4 h-4 text-muted-foreground flex-shrink-0" />
-              <input
-                ref={inputRef}
-                className="flex-1 bg-transparent text-sm outline-none placeholder:text-muted-foreground"
-                placeholder="Search stocks, indices, ETFs…"
-                value={query}
-                onChange={(e) => setQuery(e.target.value)}
-                autoFocus
-              />
-              {query && (
-                <button onClick={() => setQuery("")}>
-                  <X className="w-3.5 h-3.5 text-muted-foreground hover:text-foreground" />
+      {/* Suggestions dropdown */}
+      {showSuggestions && (
+        <div className="absolute top-full left-0 right-0 mt-1.5 bg-card border border-border rounded-xl shadow-2xl z-50 overflow-hidden animate-fade-in-up">
+          {/* Stocks section */}
+          {stockResults.length > 0 && (
+            <>
+              <p className="px-3 pt-2.5 pb-1 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+                Stocks
+              </p>
+              {stockResults.map(s => (
+                <button
+                  key={s.symbol}
+                  className="flex items-center justify-between w-full px-3 py-2 hover:bg-muted/60 transition-colors text-left"
+                  onClick={() => { router.push(`/explore/${s.symbol}`); setOpen(false); setQuery(""); }}
+                >
+                  <div className="flex items-center gap-2.5">
+                    <div className="w-7 h-7 rounded-md bg-primary/10 flex items-center justify-center flex-shrink-0">
+                      <span className="text-[9px] font-bold text-primary">{s.symbol.slice(0, 2)}</span>
+                    </div>
+                    <div>
+                      <p className="text-sm font-semibold text-foreground leading-tight">{s.symbol}</p>
+                      <p className="text-[11px] text-muted-foreground truncate max-w-[160px]">{s.name}</p>
+                    </div>
+                  </div>
+                  <div className="text-right flex-shrink-0 ml-2">
+                    <p className="text-sm font-semibold num text-foreground">{formatCurrency(s.price)}</p>
+                    <p className={cn("text-[11px] num font-medium", s.changePercent >= 0 ? "text-bull" : "text-bear")}>
+                      {s.changePercent >= 0 ? "+" : ""}{formatPercent(s.changePercent)}
+                    </p>
+                  </div>
                 </button>
-              )}
-            </div>
-            <div className="max-h-72 overflow-y-auto py-1">
-              {results.length === 0 ? (
-                <p className="text-sm text-muted-foreground text-center py-6">No results found</p>
-              ) : (
-                results.map((s) => (
-                  <button
-                    key={s.symbol}
-                    className="flex items-center justify-between w-full px-4 py-2.5 hover:bg-muted/50 transition-colors text-left"
-                    onClick={() => {
-                      router.push(`/explore/${s.symbol}`);
-                      setOpen(false);
-                      setQuery("");
-                    }}
-                  >
-                    <div className="flex items-center gap-3">
-                      <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center flex-shrink-0">
-                        <span className="text-[10px] font-bold text-primary">{s.symbol.slice(0, 2)}</span>
-                      </div>
-                      <div>
-                        <p className="text-sm font-semibold text-foreground">{s.symbol}</p>
-                        <p className="text-[11px] text-muted-foreground truncate max-w-[180px]">{s.name}</p>
-                      </div>
-                    </div>
-                    <div className="text-right flex-shrink-0">
-                      <p className="text-sm font-semibold num text-foreground">{formatCurrency(s.price)}</p>
-                      <p className={cn("text-[11px] num font-medium", s.changePercent >= 0 ? "text-bull" : "text-bear")}>
-                        {s.changePercent >= 0 ? "+" : ""}{formatPercent(s.changePercent)}
-                      </p>
-                    </div>
-                  </button>
-                ))
-              )}
-            </div>
+              ))}
+            </>
+          )}
+
+          <div className="px-3 py-2 border-t border-border">
+            <p className="text-[10px] text-muted-foreground">Press <kbd className="bg-muted px-1 py-0.5 rounded text-[9px]">Esc</kbd> to close</p>
           </div>
-        </>
+        </div>
       )}
     </div>
   );

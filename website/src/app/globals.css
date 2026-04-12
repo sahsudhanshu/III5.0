@@ -271,8 +271,6 @@
 .flash-up           { animation: price-up 0.5s ease; }
 .flash-down         { animation: price-down 0.5s ease; }
 
-/* Focus */
-*:focus-visible { outline: 2px solid #00d09c; outline-offset: 2px; }
 
 /* Groww green button overrides */
 .btn-groww {

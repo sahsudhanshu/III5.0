@@ -27,7 +27,8 @@ export default function NewsPage() {
       const t = article.title.toLowerCase();
       const isPositive = t.includes("beat") || t.includes("jump") || t.includes("rally") || t.includes("surge") || t.includes("gain");
       const isNegative = t.includes("fall") || t.includes("drop") || t.includes("decline") || t.includes("crash") || t.includes("slump");
-      const s = isPositive ? "positive" : isNegative ? "negative" : "neutral";
+      const inferred = isPositive ? "positive" : isNegative ? "negative" : "neutral";
+      const s = article.sentiment ?? inferred;
       return { ...article, sentiment: s, id: article.url || article.title };
     })
     .filter((n) => sentiment === "All" || n.sentiment === sentiment);

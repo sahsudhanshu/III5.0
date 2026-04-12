@@ -13,6 +13,7 @@ export interface NewsArticle {
   url: string;
   published: string;
   feedType: "live" | "fallback";
+  sentiment?: "positive" | "negative" | "neutral";
 }
 
 const EMPTY_ARTICLES: NewsArticle[] = [];
@@ -41,6 +42,10 @@ function normalizeApiArticles(input: unknown): NewsArticle[] {
       const summary = typeof source.summary === "string" ? source.summary : "";
       const sourceName = typeof source.source === "string" ? source.source : "Market Desk";
       const url = typeof source.url === "string" ? source.url : "#";
+      const sentiment =
+        source.sentiment === "positive" || source.sentiment === "negative" || source.sentiment === "neutral"
+          ? source.sentiment
+          : undefined;
 
       const published =
         typeof source.published === "string"
@@ -50,7 +55,7 @@ function normalizeApiArticles(input: unknown): NewsArticle[] {
             : new Date().toISOString();
 
       if (!title) return null;
-      return { title, summary, source: sourceName, url, published, feedType: "live" } satisfies NewsArticle;
+      return { title, summary, source: sourceName, url, published, feedType: "live", sentiment } satisfies NewsArticle;
     })
     .filter((a): a is NewsArticle => Boolean(a));
 }
@@ -65,6 +70,7 @@ function fallbackNews(query: string, limit: number): NewsArticle[] {
     url: n.url,
     published: n.publishedAt,
     feedType: "fallback",
+    sentiment: n.sentiment,
   }));
 
   if (!q || q === "market" || q === "finance") {

@@ -533,7 +533,7 @@ export default function StockDetailPage() {
                         </svg>
                       </div>
                       <p className="text-sm font-semibold text-foreground mb-1">No news available</p>
-                      <p className="text-xs text-muted-foreground">Live news requires Finnhub API access. Check your API key.</p>
+                      <p className="text-xs text-muted-foreground">No live or fallback news is currently available for this symbol.</p>
                     </div>
                   ) : (
                     <div className="divide-y divide-border/60">
@@ -568,6 +568,9 @@ export default function StockDetailPage() {
                                 <span className={cn("inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold border", sentimentConfig.cls)}>
                                   <span className={cn("w-1.5 h-1.5 rounded-full flex-shrink-0", sentimentConfig.dot)} />
                                   {n.sentiment}
+                                </span>
+                                <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold border border-border text-muted-foreground uppercase tracking-wide">
+                                  {(n.feedType ?? "live") === "live" ? "Live" : "Fallback"}
                                 </span>
                                 <span className="text-xs font-medium text-muted-foreground">{n.source}</span>
                                 <span className="text-xs text-muted-foreground/60 ml-auto">{timeAgo}</span>

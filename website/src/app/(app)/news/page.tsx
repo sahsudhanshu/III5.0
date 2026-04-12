@@ -2,7 +2,7 @@
 import { useState } from "react";
 import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
-import { ExternalLink, Search, Loader2 } from "lucide-react";
+import { ExternalLink, Search, Loader2, RefreshCw } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { useNews } from "@/store/news-store";
@@ -17,7 +17,7 @@ export default function NewsPage() {
   // useNews handles debouncing internally — 500ms after user stops typing,
   // the store fetches + caches results for this query.
   const query = search.trim() || "finance";
-  const { articles: rawArticles, loading } = useNews(query, 15, 500);
+  const { articles: rawArticles, loading, refresh } = useNews(query, 15, 500);
 
   // Register page context for Aria chatbot
   useChatContext("User is browsing the market news page.");
@@ -66,6 +66,16 @@ export default function NewsPage() {
             </Button>
           ))}
         </div>
+        <Button
+          variant="outline"
+          size="sm"
+          className="h-9 text-xs gap-1.5"
+          onClick={() => refresh()}
+          disabled={loading}
+        >
+          <RefreshCw className={cn("w-3.5 h-3.5", loading && "animate-spin")} />
+          Refresh News
+        </Button>
       </div>
 
       {/* Loading skeleton */}
@@ -98,19 +108,24 @@ export default function NewsPage() {
               onClick={() => article.url && window.open(article.url, "_blank")}
             >
               <div className="flex items-center justify-between">
-                <Badge
-                  className={cn(
-                    "text-xs",
-                    article.sentiment === "positive"
-                      ? "bg-bull-muted text-bull"
-                      : article.sentiment === "negative"
-                      ? "bg-bear-muted text-bear"
-                      : "bg-muted text-muted-foreground"
-                  )}
-                  variant="secondary"
-                >
-                  {article.sentiment}
-                </Badge>
+                <div className="flex items-center gap-2">
+                  <Badge
+                    className={cn(
+                      "text-xs",
+                      article.sentiment === "positive"
+                        ? "bg-bull-muted text-bull"
+                        : article.sentiment === "negative"
+                        ? "bg-bear-muted text-bear"
+                        : "bg-muted text-muted-foreground"
+                    )}
+                    variant="secondary"
+                  >
+                    {article.sentiment}
+                  </Badge>
+                  <Badge variant="outline" className="text-[10px] uppercase tracking-wide">
+                    {article.feedType === "live" ? "Live" : "Fallback"}
+                  </Badge>
+                </div>
                 <span className="text-[10px] text-muted-foreground">{article.source}</span>
               </div>
 

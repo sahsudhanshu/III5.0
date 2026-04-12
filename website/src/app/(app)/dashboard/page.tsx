@@ -6,7 +6,7 @@ import { useSession } from "next-auth/react";
 import { formatCurrency, formatPercent, cn, timeAgo } from "@/lib/utils";
 import {
   TrendingUp, TrendingDown, ArrowUpRight, ArrowDownRight,
-  ChevronRight, Clock,
+  ChevronRight, Clock, RefreshCw,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -34,7 +34,7 @@ export default function DashboardPage() {
   const [timeRange, setTimeRange] = useState("1M");
 
   // Live news via Zustand store
-  const { articles: marketNews, loading: loadingNews } = useNews("market", 4);
+  const { articles: marketNews, loading: loadingNews, refresh: refreshNews } = useNews("market", 4);
 
 
   // (dashboardContext and useChatContext declared after computed values below)
@@ -459,9 +459,19 @@ export default function DashboardPage() {
         <div className="groww-card p-4 min-w-0 min-h-[240px]">
           <div className="flex items-center justify-between mb-3">
             <p className="text-sm font-bold">Market News</p>
-            <button onClick={() => router.push("/news")} className="text-primary text-xs font-semibold flex items-center gap-0.5 hover:underline">
-              All news <ChevronRight className="w-3 h-3" />
-            </button>
+            <div className="flex items-center gap-3">
+              <button
+                onClick={() => refreshNews()}
+                className="text-muted-foreground text-xs font-semibold flex items-center gap-1 hover:text-primary transition-colors"
+                disabled={loadingNews}
+              >
+                <RefreshCw className={cn("w-3 h-3", loadingNews && "animate-spin")} />
+                Refresh
+              </button>
+              <button onClick={() => router.push("/news")} className="text-primary text-xs font-semibold flex items-center gap-0.5 hover:underline">
+                All news <ChevronRight className="w-3 h-3" />
+              </button>
+            </div>
           </div>
           <div className="space-y-3">
             {loadingNews ? (
@@ -484,6 +494,9 @@ export default function DashboardPage() {
                     <div className="flex items-center gap-2 mb-1">
                       <Badge variant="secondary" className={cn("text-[9px]", sentiment === "positive" ? "bg-bull-muted text-bull" : sentiment === "negative" ? "bg-bear-muted text-bear" : "bg-muted text-muted-foreground")}>
                         {sentiment}
+                      </Badge>
+                      <Badge variant="outline" className="text-[9px] px-1.5 py-0.5 uppercase tracking-wide">
+                        {article.feedType === "live" ? "Live" : "Fallback"}
                       </Badge>
                       <span className="text-[10px] text-muted-foreground">{article.source}</span>
                       {article.published && <span className="text-[9px] text-muted-foreground/70 ml-auto">{article.published}</span>}

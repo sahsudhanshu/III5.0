@@ -369,7 +369,7 @@ export function Navbar() {
       </div>
 
       {/* ── Bottom nav tabs (Groww style) ── */}
-      <nav className="flex items-center gap-0 px-4 lg:px-6 overflow-x-auto scrollbar-none">
+      <nav className="flex items-center gap-1 px-6 lg:px-10 overflow-x-auto scrollbar-none">
         {NAV_ITEMS.map(({ href, label }) => {
           const isActive = pathname === href || pathname.startsWith(href + "/");
           return (
@@ -377,7 +377,7 @@ export function Navbar() {
               key={href}
               href={href}
               className={cn(
-                "relative flex items-center h-10 px-4 text-sm font-medium whitespace-nowrap transition-colors border-b-2 -mb-px",
+                "relative flex items-center h-11 px-5 lg:px-6 text-sm font-medium whitespace-nowrap transition-colors border-b-2 -mb-px rounded-t-md",
                 isActive
                   ? "text-primary border-primary"
                   : "text-muted-foreground border-transparent hover:text-foreground hover:border-border"

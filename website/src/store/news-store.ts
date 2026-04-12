@@ -1,8 +1,9 @@
 "use client";
 import { useEffect, useState } from "react";
 import { create } from "zustand";
+import { MOCK_NEWS } from "@/lib/mock-data";
 
-const NEWS_API_BASE = "http://127.0.0.1:8000/api/news";
+const NEWS_API_BASE = process.env.NEXT_PUBLIC_NEWS_API_BASE ?? "/api/news";
 const STALE_MS = 5 * 60 * 1000; // 5 minutes cache TTL
 
 export interface NewsArticle {
@@ -11,6 +12,7 @@ export interface NewsArticle {
   summary: string;
   url: string;
   published: string;
+  feedType: "live" | "fallback";
 }
 
 const EMPTY_ARTICLES: NewsArticle[] = [];
@@ -24,7 +26,57 @@ interface NewsState {
   cache: Record<string, NewsCacheEntry>;
   loading: Record<string, boolean>;
   errors: Record<string, string | null>;
-  fetchNews: (query?: string, limit?: number) => Promise<void>;
+  fetchNews: (query?: string, limit?: number, force?: boolean) => Promise<void>;
+}
+
+function normalizeApiArticles(input: unknown): NewsArticle[] {
+  if (!Array.isArray(input)) return [];
+
+  return input
+    .map((item) => {
+      const source = typeof item === "object" && item !== null ? item as Record<string, unknown> : null;
+      if (!source) return null;
+
+      const title = typeof source.title === "string" ? source.title : "";
+      const summary = typeof source.summary === "string" ? source.summary : "";
+      const sourceName = typeof source.source === "string" ? source.source : "Market Desk";
+      const url = typeof source.url === "string" ? source.url : "#";
+
+      const published =
+        typeof source.published === "string"
+          ? source.published
+          : typeof source.publishedAt === "string"
+            ? source.publishedAt
+            : new Date().toISOString();
+
+      if (!title) return null;
+      return { title, summary, source: sourceName, url, published, feedType: "live" } satisfies NewsArticle;
+    })
+    .filter((a): a is NewsArticle => Boolean(a));
+}
+
+function fallbackNews(query: string, limit: number): NewsArticle[] {
+  const q = query.trim().toLowerCase();
+
+  const mapped: NewsArticle[] = MOCK_NEWS.map((n) => ({
+    title: n.title,
+    source: n.source,
+    summary: n.summary,
+    url: n.url,
+    published: n.publishedAt,
+    feedType: "fallback",
+  }));
+
+  if (!q || q === "market" || q === "finance") {
+    return mapped.slice(0, limit);
+  }
+
+  const filtered = mapped.filter((n) => {
+    const text = `${n.title} ${n.summary} ${n.source}`.toLowerCase();
+    return text.includes(q);
+  });
+
+  return (filtered.length ? filtered : mapped).slice(0, limit);
 }
 
 export function cacheKey(query: string, limit: number) {
@@ -36,7 +88,7 @@ export const useNewsStore = create<NewsState>()((set, get) => ({
   loading: {},
   errors: {},
 
-  fetchNews: async (query = "market", limit = 5) => {
+  fetchNews: async (query = "market", limit = 5, force = false) => {
     const key = cacheKey(query, limit);
     const existing = get().cache[key];
 
@@ -44,7 +96,7 @@ export const useNewsStore = create<NewsState>()((set, get) => ({
     if (get().loading[key]) return;
 
     // Skip if fresh cache exists
-    if (existing && Date.now() - existing.fetchedAt < STALE_MS) return;
+    if (!force && existing && Date.now() - existing.fetchedAt < STALE_MS) return;
 
     set((s) => ({
       loading: { ...s.loading, [key]: true },
@@ -56,15 +108,23 @@ export const useNewsStore = create<NewsState>()((set, get) => ({
         `${NEWS_API_BASE}?q=${encodeURIComponent(query)}&limit=${limit}`
       );
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
+
       const data = await res.json();
-      const articles: NewsArticle[] = data.articles ?? [];
+      let articles = normalizeApiArticles(data?.articles);
+
+      // Keep UX useful even when upstream returns empty payloads.
+      if (articles.length === 0) {
+        articles = fallbackNews(query, limit);
+      }
 
       set((s) => ({
         cache: { ...s.cache, [key]: { articles, fetchedAt: Date.now() } },
         loading: { ...s.loading, [key]: false },
       }));
     } catch (err) {
+      const articles = fallbackNews(query, limit);
       set((s) => ({
+        cache: { ...s.cache, [key]: { articles, fetchedAt: Date.now() } },
         loading: { ...s.loading, [key]: false },
         errors: { ...s.errors, [key]: String(err) },
       }));
@@ -79,28 +139,33 @@ export const useNewsStore = create<NewsState>()((set, get) => ({
  */
 export function useNews(query = "market", limit = 5, debounceMs = 0) {
   const fetchNews = useNewsStore((s) => s.fetchNews);
+  const normalizedQuery = query.trim() || "market";
 
   // Debounce the query for search inputs
-  const [debouncedQuery, setDebouncedQuery] = useState(query);
+  const [debouncedQuery, setDebouncedQuery] = useState(normalizedQuery);
+
   useEffect(() => {
-    if (debounceMs <= 0) {
-      setDebouncedQuery(query);
-      return;
-    }
-    const t = setTimeout(() => setDebouncedQuery(query), debounceMs);
+    if (debounceMs <= 0) return;
+    const t = setTimeout(() => setDebouncedQuery(normalizedQuery), debounceMs);
     return () => clearTimeout(t);
-  }, [query, debounceMs]);
+  }, [normalizedQuery, debounceMs]);
+
+  const activeQuery = debounceMs > 0 ? debouncedQuery : normalizedQuery;
 
   // Trigger fetch whenever debounced query changes
   useEffect(() => {
-    fetchNews(debouncedQuery, limit);
-  }, [debouncedQuery, limit, fetchNews]);
+    fetchNews(activeQuery, limit);
+  }, [activeQuery, limit, fetchNews]);
 
   // Reactive selectors — these re-subscribe on each render and cause
   // the component to re-render when the cache or loading map updates.
-  const key = cacheKey(debouncedQuery, limit);
+  const key = cacheKey(activeQuery, limit);
   const articles = useNewsStore((s) => s.cache[key]?.articles ?? EMPTY_ARTICLES);
   const loading = useNewsStore((s) => s.loading[key] ?? false);
 
-  return { articles, loading, activeQuery: debouncedQuery };
+  const refresh = async () => {
+    await fetchNews(activeQuery, limit, true);
+  };
+
+  return { articles, loading, activeQuery, refresh };
 }

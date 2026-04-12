@@ -2,7 +2,7 @@
 import { create } from "zustand";
 import type { Stock, NewsArticle, CandlestickDataPoint } from "@/types";
 import { toast } from "sonner";
-import { generateCandlestickData } from "@/lib/mock-data";
+import { generateCandlestickData, MOCK_NEWS } from "@/lib/mock-data";
 
 // Number of daily bars to pre-populate when using mock data
 const MOCK_CANDLE_DAYS = 252;
@@ -64,6 +64,24 @@ async function fetchFinnhub<T>(endpoint: string): Promise<T> {
 
 /** Sleep helper */
 const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
+
+function getFallbackSymbolNews(symbol: string): NewsArticle[] {
+  const sym = symbol.toUpperCase();
+  const now = Date.now();
+
+  const symbolMatched = MOCK_NEWS.filter((n) =>
+    (n.relatedSymbols || []).some((s) => s.toUpperCase() === sym)
+  );
+
+  const source = symbolMatched.length > 0 ? symbolMatched : MOCK_NEWS;
+
+  return source.slice(0, 10).map((n, idx) => ({
+    ...n,
+    id: `${n.id}_fallback_${sym}_${idx}`,
+    publishedAt: n.publishedAt || new Date(now - idx * 3600000).toISOString(),
+    feedType: "fallback",
+  }));
+}
 
 export const useDataStore = create<DataState>((set, get) => ({
   stocks: {},
@@ -158,21 +176,28 @@ export const useDataStore = create<DataState>((set, get) => ({
         source: n.source || "Finnhub",
         url: n.url || "#",
         publishedAt: new Date(n.datetime * 1000).toISOString(),
+        feedType: "live",
         sentiment: "neutral" as const,
         relatedSymbols: [n.related || symbol],
         imageUrl: n.image || undefined,
       }));
 
+      const finalNews = parsedNews.length > 0 ? parsedNews : getFallbackSymbolNews(symbol);
+
       set((state) => ({
-        news: { ...state.news, [symbol]: parsedNews },
+        news: { ...state.news, [symbol]: finalNews },
         isFetching: { ...state.isFetching, [`news_${symbol}`]: false },
       }));
 
-      return parsedNews;
+      return finalNews;
     } catch (error) {
       console.error("Failed to fetch news:", error);
-      set((state) => ({ isFetching: { ...state.isFetching, [`news_${symbol}`]: false } }));
-      return [];
+      const fallbackNews = getFallbackSymbolNews(symbol);
+      set((state) => ({
+        news: { ...state.news, [symbol]: fallbackNews },
+        isFetching: { ...state.isFetching, [`news_${symbol}`]: false },
+      }));
+      return fallbackNews;
     }
   },
 

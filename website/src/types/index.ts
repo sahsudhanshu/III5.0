@@ -133,6 +133,7 @@ export interface NewsArticle {
   source: string;
   url: string;
   publishedAt: string;
+  feedType?: "live" | "fallback";
   sentiment: "positive" | "negative" | "neutral";
   relatedSymbols: string[];
   imageUrl?: string;

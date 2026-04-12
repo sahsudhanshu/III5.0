@@ -1,21 +1,71 @@
 "use client";
+import { useMemo, useState } from "react";
 import { useWatchlistStore } from "@/store/watchlist-store";
 import { useRouter } from "next/navigation";
 import { formatCurrency, formatPercent, cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Star, TrendingUp, TrendingDown, Trash2, Plus } from "lucide-react";
 import { toast } from "sonner";
 import { useRequireAuth } from "@/hooks/use-require-auth";
+import { INITIAL_UNIVERSE, useDataStore } from "@/store/data-store";
 
 export default function WatchlistPage() {
-  const { items, removeFromWatchlist } = useWatchlistStore();
+  const { items, removeFromWatchlist, addToWatchlist, isInWatchlist } = useWatchlistStore();
+  const { stocks, fetchStockProfile } = useDataStore();
   const router = useRouter();
   const { isAuthenticated, requireAuth } = useRequireAuth();
+  const [showAddPanel, setShowAddPanel] = useState(false);
+  const [symbolInput, setSymbolInput] = useState("");
+  const [adding, setAdding] = useState(false);
+
+  const quickPicks = useMemo(
+    () => INITIAL_UNIVERSE.filter((s) => !isInWatchlist(s)).slice(0, 8),
+    [isInWatchlist]
+  );
   
   const handleRemove = (symbol: string, e: React.MouseEvent) => {
     e.stopPropagation();
     removeFromWatchlist(symbol);
     toast.success(`${symbol} removed from watchlist`);
+  };
+
+  const handleAddStock = async (rawSymbol?: string) => {
+    const symbol = (rawSymbol ?? symbolInput).trim().toUpperCase();
+    if (!symbol) {
+      toast.error("Enter a stock symbol");
+      return;
+    }
+
+    if (isInWatchlist(symbol)) {
+      toast.info(`${symbol} is already in your watchlist`);
+      return;
+    }
+
+    setAdding(true);
+    try {
+      const stock = stocks[symbol] ?? await fetchStockProfile(symbol);
+      if (!stock) {
+        toast.error(`Could not find ${symbol}. Try another symbol.`);
+        return;
+      }
+
+      addToWatchlist({
+        symbol: stock.symbol,
+        name: stock.name,
+        exchange: stock.exchange,
+        price: stock.price,
+        change: stock.change,
+        changePercent: stock.changePercent,
+        volume: stock.volume,
+        addedAt: new Date().toISOString(),
+      });
+
+      toast.success(`${stock.symbol} added to watchlist`);
+      setSymbolInput("");
+    } finally {
+      setAdding(false);
+    }
   };
 
   if (!isAuthenticated) {
@@ -45,18 +95,55 @@ export default function WatchlistPage() {
           <h1 className="text-2xl font-bold">Watchlist</h1>
           <p className="text-muted-foreground text-sm">{items.length} stocks being tracked</p>
         </div>
-        <Button size="sm" className="gap-2" onClick={() => router.push("/markets")}>
+        <Button size="sm" className="gap-2" onClick={() => setShowAddPanel((v) => !v)}>
           <Plus className="w-3.5 h-3.5" />
           Add Stocks
         </Button>
       </div>
 
+      {showAddPanel && (
+        <div className="bg-card border border-border rounded-xl p-4 space-y-3">
+          <div className="flex flex-col sm:flex-row gap-2">
+            <Input
+              placeholder="Enter stock symbol (e.g., AAPL)"
+              value={symbolInput}
+              onChange={(e) => setSymbolInput(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  e.preventDefault();
+                  handleAddStock();
+                }
+              }}
+              className="h-9 sm:flex-1"
+            />
+            <Button className="h-9" onClick={() => handleAddStock()} disabled={adding}>
+              {adding ? "Adding..." : "Add"}
+            </Button>
+          </div>
+
+          {quickPicks.length > 0 && (
+            <div className="flex flex-wrap gap-2">
+              {quickPicks.map((symbol) => (
+                <button
+                  key={symbol}
+                  onClick={() => handleAddStock(symbol)}
+                  className="px-2.5 py-1 rounded-full text-xs bg-muted hover:bg-muted/70 text-foreground transition-colors"
+                  disabled={adding}
+                >
+                  + {symbol}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
       {items.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-24 text-center">
           <Star className="w-12 h-12 text-muted-foreground/30 mb-4" />
           <p className="text-lg font-semibold text-muted-foreground">No stocks in watchlist</p>
-          <p className="text-sm text-muted-foreground mb-6">Add stocks from the Markets page to track them here</p>
-          <Button onClick={() => router.push("/markets")}>Browse Markets</Button>
+          <p className="text-sm text-muted-foreground mb-6">Use Add Stocks above to start tracking your favorites</p>
+          <Button onClick={() => setShowAddPanel(true)}>Add Your First Stock</Button>
         </div>
       ) : (
         <div className="bg-card border border-border rounded-xl overflow-hidden">

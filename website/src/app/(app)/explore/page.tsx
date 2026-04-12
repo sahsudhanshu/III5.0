@@ -6,6 +6,7 @@ import { formatCurrency, formatPercent, cn, formatNumber } from "@/lib/utils";
 import {
   TrendingUp, TrendingDown, ChevronRight, Flame, Star,
   Newspaper, BarChart2, ArrowUpRight, ArrowDownRight,
+  RefreshCw,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { AreaChart, Area, ResponsiveContainer } from "recharts";
@@ -173,7 +174,7 @@ export default function ExplorePage() {
   const [loading, setLoading] = useState(true);
 
   // Live news via Zustand store
-  const { articles: marketNews, loading: loadingNews } = useNews("market", 4);
+  const { articles: marketNews, loading: loadingNews, refresh: refreshNews } = useNews("market", 4);
 
   // Register page context for Aria chatbot
   useChatContext("User is browsing the stock explorer page.");
@@ -347,6 +348,16 @@ export default function ExplorePage() {
               icon={<Newspaper className="w-4 h-4 text-chart-2" />}
               onViewAll={() => router.push("/news")}
             />
+            <div className="flex justify-end mb-2">
+              <button
+                onClick={() => refreshNews()}
+                className="text-muted-foreground text-xs font-semibold flex items-center gap-1 hover:text-primary transition-colors"
+                disabled={loadingNews}
+              >
+                <RefreshCw className={cn("w-3 h-3", loadingNews && "animate-spin")} />
+                Refresh
+              </button>
+            </div>
             <div className="space-y-3">
               {loadingNews ? (
                 <div className="space-y-4">
@@ -382,6 +393,9 @@ export default function ExplorePage() {
                           )}
                         >
                           {sentiment}
+                        </Badge>
+                        <Badge variant="outline" className="text-[9px] px-1.5 py-0.5 uppercase tracking-wide">
+                          {article.feedType === "live" ? "Live" : "Fallback"}
                         </Badge>
                         <span className="text-[10px] text-muted-foreground">{article.source}</span>
                         {article.published && <span className="text-[9px] text-muted-foreground/70 ml-auto">{article.published}</span>}

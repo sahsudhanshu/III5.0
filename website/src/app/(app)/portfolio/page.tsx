@@ -93,7 +93,17 @@ function FundsModal({
 // ── Main Portfolio Page ─────────────────────────────────────────
 export default function PortfolioPage() {
   const router = useRouter();
-  const { portfolio, loading, fetchPortfolio, manageFunds, enrichWithPrices } = usePortfolioStore();
+  const {
+    portfolio,
+    loading,
+    fetchPortfolio,
+    fetchAiInsight,
+    aiInsight,
+    aiInsightLoading,
+    aiInsightError,
+    manageFunds,
+    enrichWithPrices,
+  } = usePortfolioStore();
   const { prices } = useMarketStore();
   const [timeRange, setTimeRange] = useState("3M");
   const [fundsModal, setFundsModal] = useState<"DEPOSIT" | "WITHDRAW" | null>(null);
@@ -103,8 +113,9 @@ export default function PortfolioPage() {
   useEffect(() => {
     if (isAuthenticated) {
       fetchPortfolio();
+      fetchAiInsight();
     }
-  }, [fetchPortfolio, isAuthenticated]);
+  }, [fetchPortfolio, fetchAiInsight, isAuthenticated]);
 
   // Enrich holdings with live Finnhub prices whenever prices tick
   const priceMap = useCallback(() => {
@@ -349,6 +360,77 @@ export default function PortfolioPage() {
             <Area type="monotone" dataKey="value" stroke="oklch(0.65 0.18 151)" strokeWidth={2} fill="url(#grad)" dot={false} />
           </AreaChart>
         </ResponsiveContainer>
+      </div>
+
+      {/* AI Insight */}
+      <div className="groww-card p-5 space-y-3">
+        <div className="flex items-center justify-between">
+          <div>
+            <h2 className="font-semibold">AI Insight</h2>
+            <p className="text-xs text-muted-foreground">RL rebalancing + market sentiment guidance</p>
+          </div>
+          <button
+            onClick={() => fetchAiInsight()}
+            className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-primary/10 text-primary border border-primary/30 hover:bg-primary/20 transition-colors"
+          >
+            Refresh Insight
+          </button>
+        </div>
+
+        {aiInsightLoading && (
+          <p className="text-sm text-muted-foreground">Generating AI insight...</p>
+        )}
+
+        {!aiInsightLoading && aiInsightError && (
+          <p className="text-sm text-bear">{aiInsightError}</p>
+        )}
+
+        {!aiInsightLoading && aiInsight && (
+          <>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+              <div className="rounded-xl border border-border p-3">
+                <p className="text-[11px] text-muted-foreground">Net Worth</p>
+                <p className="text-lg font-bold num">{formatCurrency(aiInsight.net_worth)}</p>
+              </div>
+              <div className="rounded-xl border border-border p-3">
+                <p className="text-[11px] text-muted-foreground">Buy Ideas</p>
+                <p className="text-lg font-bold num text-bull">{aiInsight.buy_suggestions.length}</p>
+              </div>
+              <div className="rounded-xl border border-border p-3">
+                <p className="text-[11px] text-muted-foreground">Sell Ideas</p>
+                <p className="text-lg font-bold num text-bear">{aiInsight.sell_suggestions.length}</p>
+              </div>
+            </div>
+
+            <p className="text-sm leading-relaxed text-foreground/90">{aiInsight.ai_insight_text}</p>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              <div className="rounded-xl border border-border p-3">
+                <p className="text-xs font-semibold text-bull mb-2">Top Buys</p>
+                {aiInsight.buy_suggestions.slice(0, 3).map((s) => (
+                  <p key={`buy-${s.ticker}`} className="text-xs text-muted-foreground">
+                    {s.ticker}: Buy {Math.abs(s.shares_to_trade).toFixed(2)} shares (target {s.target_weight_pct}%)
+                  </p>
+                ))}
+                {aiInsight.buy_suggestions.length === 0 && (
+                  <p className="text-xs text-muted-foreground">No buy action suggested now.</p>
+                )}
+              </div>
+
+              <div className="rounded-xl border border-border p-3">
+                <p className="text-xs font-semibold text-bear mb-2">Top Sells</p>
+                {aiInsight.sell_suggestions.slice(0, 3).map((s) => (
+                  <p key={`sell-${s.ticker}`} className="text-xs text-muted-foreground">
+                    {s.ticker}: Sell {Math.abs(s.shares_to_trade).toFixed(2)} shares (target {s.target_weight_pct}%)
+                  </p>
+                ))}
+                {aiInsight.sell_suggestions.length === 0 && (
+                  <p className="text-xs text-muted-foreground">No sell action suggested now.</p>
+                )}
+              </div>
+            </div>
+          </>
+        )}
       </div>
 
       {/* Holdings Table */}

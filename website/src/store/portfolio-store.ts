@@ -38,12 +38,39 @@ export interface PortfolioData {
   transactions: PortfolioTransaction[];
 }
 
+export interface PortfolioInsightItem {
+  ticker: string;
+  action: "BUY" | "SELL" | "HOLD";
+  shares_to_trade: number;
+  target_weight_pct: number;
+  target_quantity: number;
+  current_price: number;
+  sentiment_score: number;
+}
+
+export interface PortfolioInsightData {
+  cash_balance: number;
+  net_worth: number;
+  tracked_tickers: string[];
+  ignored_symbols: string[];
+  average_market_sentiment: number;
+  buy_suggestions: PortfolioInsightItem[];
+  sell_suggestions: PortfolioInsightItem[];
+  per_ticker_plan: PortfolioInsightItem[];
+  ai_insight_text: string;
+  ai_insight_source: "gemini" | "template";
+}
+
 interface PortfolioState {
   portfolio: PortfolioData | null;
   loading: boolean;
   error: string | null;
+  aiInsight: PortfolioInsightData | null;
+  aiInsightLoading: boolean;
+  aiInsightError: string | null;
 
   fetchPortfolio: () => Promise<void>;
+  fetchAiInsight: () => Promise<void>;
   placeOrder: (params: {
     type: "BUY" | "SELL";
     symbol: string;
@@ -62,6 +89,9 @@ export const usePortfolioStore = create<PortfolioState>()((set, get) => ({
   portfolio: null,
   loading: false,
   error: null,
+  aiInsight: null,
+  aiInsightLoading: false,
+  aiInsightError: null,
 
   // ── Fetch Portfolio ──────────────────────────────────────────
   fetchPortfolio: async () => {
@@ -74,6 +104,19 @@ export const usePortfolioStore = create<PortfolioState>()((set, get) => ({
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : "Unknown error";
       set({ error: msg, loading: false });
+    }
+  },
+
+  fetchAiInsight: async () => {
+    set({ aiInsightLoading: true, aiInsightError: null });
+    try {
+      const res = await fetch("/api/portfolio?mode=insight");
+      const data = await res.json();
+      if (!res.ok) throw new Error(data?.message ?? "Failed to load AI insight");
+      set({ aiInsight: data as PortfolioInsightData, aiInsightLoading: false });
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : "Unknown error";
+      set({ aiInsightError: msg, aiInsightLoading: false });
     }
   },
 

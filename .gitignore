@@ -8,3 +8,4 @@ outputs/
 
 # Large local model bundles (do not commit)
 backend/stock_price_prediction/*.pt
+backend/rl_balancer/portfolio_agent_1M/

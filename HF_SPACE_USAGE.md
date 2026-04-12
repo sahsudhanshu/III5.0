@@ -6,7 +6,9 @@ This guide explains how to use the deployed Hugging Face Space backend:
 - Health endpoint: `GET /health`
 - APIs:
   - `POST /sector-sentiment`
+  - `POST /sector-sentiment-headlines`
   - `POST /stock-forecast`
+  - `POST /portfolio-ai-insight`
 
 ---
 
@@ -102,7 +104,34 @@ Example response shape:
 
 ---
 
-## 4) Required Space variables/secrets
+## 4) Portfolio AI Insight API (RL + Gemini text)
+
+Request:
+
+```bash
+curl -X POST https://SaqlainSQX-iii5-backend.hf.space/portfolio-ai-insight \
+  -H "Content-Type: application/json" \
+  -d '{
+    "cash_balance": 2500,
+    "holdings": [
+      {"symbol":"AAPL","qty":8},
+      {"symbol":"MSFT","qty":4},
+      {"symbol":"NVDA","qty":2}
+    ],
+    "sentiment_source":"gnews",
+    "headlines_per_ticker":5,
+    "use_gemini":true
+  }'
+```
+
+Response contains:
+- `buy_suggestions` and `sell_suggestions` with per-ticker target weights
+- `ai_insight_text` with human-readable recommendation
+- `per_ticker_plan`, `net_worth`, and market sentiment aggregate
+
+---
+
+## 5) Required Space variables/secrets
 
 In Hugging Face Space **Settings → Variables and secrets**, set:
 
@@ -112,15 +141,16 @@ In Hugging Face Space **Settings → Variables and secrets**, set:
 - `BUNDLE_REPO_ID=SaqlainSQX/iii`
 - `BUNDLE_FILENAME=unified_stock_brain.pt`
 - `TRUSTED_CHECKPOINT=1`
+- `GEMINI_MODEL=models/gemini-2.0-flash` (optional; default shown)
 
 ### Secrets
 
 - `HF_TOKEN=<your_hf_token>` (required if `SaqlainSQX/iii` is private)
-- `GEMINI_API_KEY=<optional>` (needed only when `use_gemini=true`)
+- `GEMINI_API_KEY=<optional>` (needed when `use_gemini=true` for `/stock-forecast` or `/portfolio-ai-insight`)
 
 ---
 
-## 5) Fixing `Internal Server Error`
+## 6) Fixing `Internal Server Error`
 
 If `/health` works but POST endpoints return 500:
 
@@ -135,7 +165,7 @@ If `/health` works but POST endpoints return 500:
 
 ---
 
-## 6) Notes
+## 7) Notes
 
 - `curl: ... libcurl.so.4 ...` shown in your local terminal is a local conda warning, not a Space failure.
 - `news_source: "gnews"` uses latest news; `"yfinance"` uses ticker news feed.

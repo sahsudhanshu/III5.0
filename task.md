@@ -24,13 +24,13 @@
     - Moved backend port to 8001 to avoid clashes with the Trading Agent.
 
 ### ⏳ Pending / In-Progress
-- [/] **Dependency Stability**: Finalizing `fastapi` and `ta` installation in the specific backend environment.
-- [/] **Live Data Verification**: Running a full test cycle (Input ticker -> FastAPI build -> Neo4j update -> Cytoscape render).
+- [x] **Dependency Stability**: Finalizing `fastapi`, `neo4j`, `vaderSentiment`, and `ta` installation in the specific backend environment.
+- [x] **Live Data Verification**: Running a full test cycle (Input ticker -> FastAPI build -> Neo4j update -> Cytoscape render).
 
 ### 🚀 Next Steps
-- [ ] **Auth Enforcement**: Implement login checks for "Buy/Sell simulation" and "AI Insights" buttons within the graph.
-- [ ] **UI Polish**: Add subtle micro-animations to node transitions and improve tooltip responsiveness.
-- [ ] **Error Handling**: Add clear UI feedback in the graph view if the Neo4j or FastAPI services are down.
+- [x] **Auth Enforcement**: Implement login checks for "Buy/Sell simulation" and "AI Insights" buttons within the graph.
+- [x] **UI Polish**: Add subtle micro-animations to node transitions and improve tooltip responsiveness.
+- [x] **Error Handling**: Add clear UI feedback in the graph view if the Neo4j or FastAPI services are down.
 
 ---
 

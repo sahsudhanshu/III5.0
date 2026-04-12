@@ -15,10 +15,8 @@ export async function GET() {
     const nodeQuery = `MATCH (n) RETURN id(n) AS id, labels(n)[0] AS label, properties(n) AS p`;
     const edgeQuery = `MATCH (a)-[r]->(b) RETURN id(a) AS source, id(b) AS target, type(r) AS t, properties(r) AS p`;
 
-    const [nodeResult, edgeResult] = await Promise.all([
-      session.run(nodeQuery),
-      session.run(edgeQuery)
-    ]);
+    const nodeResult = await session.run(nodeQuery);
+    const edgeResult = await session.run(edgeQuery);
 
     const nodes = nodeResult.records.map(record => ({
       data: {

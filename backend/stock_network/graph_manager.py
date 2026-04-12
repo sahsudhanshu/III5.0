@@ -8,6 +8,8 @@ real stock data and computed metrics.
 import logging
 from typing import Dict, List, Optional
 
+import pandas as pd
+
 logger = logging.getLogger(__name__)
 
 
@@ -120,8 +122,12 @@ def build_full_graph(
 ):
     """End-to-end pipeline: fetch data → compute metrics → populate Neo4j.
 
+    New tickers are ADDED to the existing graph (not replaced).
+    Cross-correlations and sector edges are computed between new and
+    existing tickers so the graph stays fully connected.
+
     Args:
-        tickers:  list of stock ticker symbols
+        tickers:  list of stock ticker symbols to add
         period:   yfinance period string
         min_correlation:  threshold for CORRELATED_WITH edges
         max_news_per_company:  number of news articles to fetch per company
@@ -151,18 +157,33 @@ def build_full_graph(
         conn.connect()
 
     try:
-        # 0  Prepare DB
-        logger.info("🗑️  Clearing existing graph …")
-        conn.clear_graph()
+        # 0  Ensure indexes exist (idempotent — safe to call every time)
         conn.create_indexes()
 
-        # 1  Fetch stock price data
+        # 0b  Discover tickers already in the graph
+        existing_rows = conn.run_query(
+            "MATCH (c:Company) RETURN c.ticker AS ticker"
+        )
+        existing_tickers: List[str] = [
+            r["ticker"] for r in existing_rows if r.get("ticker")
+        ]
+        new_tickers = [t.upper() for t in tickers]
+
+        # all_tickers = union of existing + new (for cross-correlation)
+        all_tickers = list(dict.fromkeys(existing_tickers + new_tickers))
+        logger.info(
+            f"Existing tickers in graph: {existing_tickers} | "
+            f"New tickers to add: {new_tickers} | "
+            f"Full set for analysis: {all_tickers}"
+        )
+
+        # 1  Fetch stock price data for ALL tickers (existing + new)
         logger.info("📊 Fetching stock data …")
-        raw_data = fetch_multi_stock_data(tickers, period=period)
+        raw_data = fetch_multi_stock_data(all_tickers, period=period)
         prices = get_close_prices(raw_data)
         volumes = get_volumes(raw_data)
 
-        # Add SPY as benchamrk for beta (if not already present)
+        # Add SPY as benchmark for beta (if not already present)
         if "SPY" not in prices.columns:
             try:
                 spy_data = fetch_multi_stock_data(["SPY"], period=period)
@@ -171,7 +192,7 @@ def build_full_graph(
             except Exception:
                 logger.warning("Could not fetch SPY for beta computation")
 
-        # 2  Compute analysis metrics
+        # 2  Compute analysis metrics across ALL tickers
         logger.info("🔢 Computing metrics …")
         returns = compute_log_returns(prices)
         volatilities = compute_volatility(returns)
@@ -185,21 +206,26 @@ def build_full_graph(
         vol_metrics = compute_volume_metrics(volumes)
         trend_similarity = build_trend_similarity_scores(tech_inds)
 
-        # 3  Fetch company info
+        # 3  Fetch company info — only for NEW tickers
         logger.info("🏢 Fetching company metadata …")
-        # Only real tickers, not SPY (unless user specified it)
-        real_tickers = [t for t in tickers if t in prices.columns]
+        real_new_tickers = [t for t in new_tickers if t in prices.columns]
         company_info: Dict[str, dict] = {}
-        for t in real_tickers:
+        for t in real_new_tickers:
             company_info[t] = get_company_info(t)
 
-        # 4  Fetch news
+        # Also load info for existing tickers (needed for sector edges)
+        existing_company_info: Dict[str, dict] = {}
+        for t in existing_tickers:
+            if t in prices.columns:
+                existing_company_info[t] = get_company_info(t)
+
+        # 4  Fetch news — only for NEW tickers
         logger.info("📰 Fetching news from DuckDuckGo …")
         news_map = fetch_news_for_tickers(company_info, max_per_company=max_news_per_company, delay=0.8)
 
-        # 5  Create Company nodes
+        # 5  Create / update Company nodes — only for NEW tickers
         logger.info("🏗️  Creating Company nodes …")
-        for t in real_tickers:
+        for t in real_new_tickers:
             info = company_info[t]
             params = {
                 "ticker": t,
@@ -228,10 +254,10 @@ def build_full_graph(
             }
             conn.run_write(_CREATE_COMPANY, params)
 
-        # 6  Create Product nodes (from sector / industry)
+        # 6  Create Product nodes (from sector / industry) — only for NEW tickers
         logger.info("📦 Creating Product nodes …")
         products_created = set()
-        for t in real_tickers:
+        for t in real_new_tickers:
             info = company_info[t]
             industry = info.get("industry", "Unknown")
             sector = info.get("sector", "Unknown")
@@ -253,8 +279,7 @@ def build_full_graph(
         # 7  Create RELATED_PRODUCT edges (same sector → related products)
         products_by_sector: Dict[str, List[str]] = {}
         for pname in products_created:
-            # get sector for this product from company_info
-            for t in real_tickers:
+            for t in real_new_tickers:
                 info = company_info[t]
                 if info.get("industry") == pname:
                     sec = info.get("sector", "")
@@ -266,7 +291,7 @@ def build_full_graph(
                 for pb in unique_products[i + 1:]:
                     conn.run_write(_RELATED_PRODUCT, {"product_a": pa, "product_b": pb})
 
-        # 8  Create News nodes + MENTIONED_IN edges
+        # 8  Create News nodes + MENTIONED_IN edges — only for NEW tickers
         logger.info("📰 Creating News nodes …")
         all_news_titles_per_ticker: Dict[str, List[str]] = {}
         for t, articles in news_map.items():
@@ -293,12 +318,21 @@ def build_full_graph(
         # RELATED_NEWS: news items sharing companies
         _create_related_news(conn, all_news_titles_per_ticker)
 
-        # 9  CORRELATED_WITH edges
+        # 9  CORRELATED_WITH edges — computed across ALL tickers
+        #    (includes new↔existing cross-correlations)
         logger.info("🔗 Creating CORRELATED_WITH edges …")
+        # Build set of valid tickers in the graph
+        all_real = set(real_new_tickers) | set(
+            t for t in existing_tickers if t in prices.columns
+        )
         for pair in corr_pairs:
             a, b = pair["ticker_a"], pair["ticker_b"]
-            if a not in real_tickers or b not in real_tickers:
+            # At least one of the pair must be a NEW ticker
+            # (existing↔existing edges already exist in the graph)
+            if a not in all_real or b not in all_real:
                 continue
+            if a not in real_new_tickers and b not in real_new_tickers:
+                continue  # both already existed — edge was created earlier
             conn.run_write(_CORRELATED_WITH, {
                 "ticker_a": a,
                 "ticker_b": b,
@@ -308,7 +342,7 @@ def build_full_graph(
                 "strength": pair["strength"],
                 "direction": pair["direction"],
             })
-            
+
             # If high correlation + similar trend, add RELATED_TO
             trend_score = trend_similarity.get((a, b), 0.0)
             if pair["abs_avg"] > 0.4 and trend_score >= 0.6:
@@ -319,22 +353,55 @@ def build_full_graph(
                     "reason": f"High correlation ({pair['abs_avg']:.2f}) + similar trend ({trend_score:.2f})"
                 })
 
-        # 10  SAME_SECTOR edges
+        # 10  SAME_SECTOR edges — between new tickers AND between new↔existing
         logger.info("🏷️  Creating SAME_SECTOR edges …")
+        # Merge company info for sector lookup
+        all_company_info = {**existing_company_info, **company_info}
         sector_groups: Dict[str, List[str]] = {}
-        for t in real_tickers:
-            sec = company_info[t].get("sector", "Unknown")
+        for t in all_real:
+            sec = all_company_info.get(t, {}).get("sector", "Unknown")
             sector_groups.setdefault(sec, []).append(t)
         for sec, group in sector_groups.items():
             if sec == "Unknown":
                 continue
             for i, a in enumerate(group):
                 for b in group[i + 1:]:
-                    conn.run_write(_SAME_SECTOR, {"ticker_a": a, "ticker_b": b})
+                    # Only create edge if at least one ticker is new
+                    if a in real_new_tickers or b in real_new_tickers:
+                        conn.run_write(_SAME_SECTOR, {"ticker_a": a, "ticker_b": b})
+
+        # 11  Ensure new tickers are connected to existing companies
+        logger.info("🔌 Ensuring new tickers are connected …")
+        existing_in_prices = [t for t in existing_tickers if t in prices.columns]
+        for t in real_new_tickers:
+            rel_count = conn.run_query(
+                "MATCH (a:Company {ticker: $ticker})--(b:Company) RETURN count(b) AS cnt",
+                {"ticker": t},
+            )
+            if rel_count and rel_count[0].get("cnt", 0) > 0:
+                continue
+
+            best = _best_correlation_pair(returns, t, existing_in_prices)
+            if best:
+                conn.run_write(_RELATED_TO, {
+                    "ticker_a": t,
+                    "ticker_b": best["ticker"],
+                    "strength": best["abs_avg"],
+                    "reason": f"Fallback: nearest correlation ({best['abs_avg']:.2f})",
+                })
+                continue
+
+            if existing_in_prices:
+                conn.run_write(_RELATED_TO, {
+                    "ticker_a": t,
+                    "ticker_b": existing_in_prices[0],
+                    "strength": 0.0,
+                    "reason": "Fallback: seed link",
+                })
 
         # Done
         stats = conn.get_stats()
-        logger.info(f"✅ Graph built! {stats}")
+        logger.info(f"✅ Graph updated! {stats}")
         return stats
 
     finally:
@@ -359,3 +426,44 @@ def _create_related_news(conn, titles_per_ticker: Dict[str, List[str]]):
                 for tit_b in titles_per_ticker[tb]:
                     if tit_a != tit_b and (tit_a in shared or tit_b in shared):
                         conn.run_write(_NEWS_RELATED, {"title_a": tit_a, "title_b": tit_b})
+
+
+def _best_correlation_pair(
+    returns: pd.DataFrame,
+    ticker: str,
+    candidates: List[str],
+) -> Optional[Dict[str, float]]:
+    """Find the most correlated existing ticker for fallback connectivity."""
+    if ticker not in returns.columns:
+        return None
+
+    try:
+        from scipy.stats import pearsonr, spearmanr
+    except Exception:
+        return None
+
+    best = None
+    for other in candidates:
+        if other not in returns.columns:
+            continue
+        sa = returns[ticker].dropna()
+        sb = returns[other].dropna()
+        common = sa.index.intersection(sb.index)
+        if len(common) < 20:
+            continue
+
+        sa, sb = sa.loc[common], sb.loc[common]
+        try:
+            p_corr, _ = pearsonr(sa, sb)
+        except Exception:
+            p_corr = 0.0
+        try:
+            s_corr, _ = spearmanr(sa, sb)
+        except Exception:
+            s_corr = 0.0
+
+        abs_avg = (abs(p_corr) + abs(s_corr)) / 2
+        if best is None or abs_avg > best["abs_avg"]:
+            best = {"ticker": other, "abs_avg": round(float(abs_avg), 4)}
+
+    return best

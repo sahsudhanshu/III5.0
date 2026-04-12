@@ -27,3 +27,8 @@ huggingface-hub>=0.23.0
 # News + LLM (optional at runtime)
 gnews>=0.3.9
 google-generativeai>=0.7.0
+
+# Graph & Analysis
+neo4j>=5.14.0
+ta>=0.11.0
+vaderSentiment>=3.3.2

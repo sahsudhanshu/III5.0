@@ -79,6 +79,8 @@ def get_close_prices(data: Dict[str, pd.DataFrame]) -> pd.DataFrame:
         s = df[col].copy()
         if isinstance(s.index, pd.DatetimeIndex):
             s.index = pd.to_datetime(s.index.date)
+        # Remove duplicate dates that can arise from timezone → date conversion
+        s = s[~s.index.duplicated(keep='last')]
         close[ticker] = s
     prices = pd.DataFrame(close).dropna()
     return prices
@@ -92,6 +94,7 @@ def get_volumes(data: Dict[str, pd.DataFrame]) -> pd.DataFrame:
             s = df["Volume"].copy()
             if isinstance(s.index, pd.DatetimeIndex):
                 s.index = pd.to_datetime(s.index.date)
+            s = s[~s.index.duplicated(keep='last')]
             vols[ticker] = s
     return pd.DataFrame(vols).fillna(0)
 

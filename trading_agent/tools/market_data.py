@@ -27,7 +27,7 @@ def get_market_snapshot(symbols: list[str], period: str = "3y") -> str:
     Returns:
         Formatted string with stock prices, volumes, and statistics as arrays
     """
-    print(f"📊 [TOOL] get_market_snapshot called → symbols={symbols!r}, period={period!r}")
+    logger.info(f"[TOOL] get_market_snapshot called -> symbols={symbols!r}, period={period!r}")
     
     if not symbols:
         return "⚠️ Error: No symbols provided"
@@ -106,11 +106,11 @@ def get_market_snapshot(symbols: list[str], period: str = "3y") -> str:
                 }
         
         # Format output as readable string
-        lines = [f"📊 Market Data Snapshot (Period: {period})\n"]
+        lines = [f"Market Data Snapshot (Period: {period})\n"]
         
         for symbol, data in results.items():
             if data.get("status") == "error":
-                lines.append(f"❌ {symbol}: {data.get('message')}\n")
+                lines.append(f"ERROR {symbol}: {data.get('message')}\n")
             else:
                 lines.append(f"\n**{symbol}**")
                 lines.append(f"  Current Price: ${data['current_price']}")

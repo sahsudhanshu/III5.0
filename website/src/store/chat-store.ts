@@ -82,21 +82,41 @@ export const useChatStore = create<ChatState>()((set, get) => ({
       isTyping: true,
     }));
 
-    // Simulate AI processing delay
-    await new Promise((r) => setTimeout(r, 1000 + Math.random() * 1000));
+    // Connect to actual local FastAPI LangGraph agent
+    try {
+      const response = await fetch("http://127.0.0.1:8000/api/chat", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ message: content, context: get().context }),
+      });
+      
+      const data = await response.json();
+      const aiResponse = data.response || "No response received.";
+      
+      const assistantMsg: ChatMessage = {
+        id: generateId(),
+        role: "assistant",
+        content: aiResponse,
+        timestamp: new Date().toISOString(),
+      };
 
-    const aiResponse = getAIResponse(content, get().context);
-    const assistantMsg: ChatMessage = {
-      id: generateId(),
-      role: "assistant",
-      content: aiResponse,
-      timestamp: new Date().toISOString(),
-    };
-
-    set((s) => ({
-      messages: [...s.messages, assistantMsg],
-      isTyping: false,
-    }));
+      set((s) => ({
+        messages: [...s.messages, assistantMsg],
+        isTyping: false,
+      }));
+    } catch (e) {
+      console.error("Chat API error:", e);
+      const errorMsg: ChatMessage = {
+        id: generateId(),
+        role: "assistant",
+        content: "⚠️ I'm having trouble connecting to my trading agent brain. Please make sure the Python server is running (`python server.py`).",
+        timestamp: new Date().toISOString(),
+      };
+      set((s) => ({
+        messages: [...s.messages, errorMsg],
+        isTyping: false,
+      }));
+    }
   },
 
   setContext: (context) => set({ context }),

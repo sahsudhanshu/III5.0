@@ -12,16 +12,14 @@ import { useWatchlistStore } from "@/store/watchlist-store";
 import { useChatStore } from "@/store/chat-store";
 import { useMarketStore } from "@/store/market-store";
 import { useDataStore, INITIAL_UNIVERSE } from "@/store/data-store";
+import { usePortfolioStore } from "@/store/portfolio-store";
 import { ChartSkeleton } from "@/components/common/skeletons";
 import { toast } from "sonner";
 import {
   TrendingUp, TrendingDown, Star, Bot, ArrowLeft,
   CandlestickChart, LineChart,
 } from "lucide-react";
-import {
-  AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip,
-  ResponsiveContainer, BarChart, Bar, ComposedChart, Line,
-} from "recharts";
+import { TradingChart } from "@/components/common/trading-chart";
 import type { TimeFilter, ChartType } from "@/types";
 
 const TIME_FILTERS: TimeFilter[] = ["1W", "1M", "3M", "1Y"];
@@ -44,6 +42,7 @@ export default function StockDetailPage() {
   const { prices, subscribe, unsubscribe } = useMarketStore();
   
   const { stocks, news, candles, fetchStockProfile, fetchNews, fetchCandles } = useDataStore();
+  const { portfolio, fetchPortfolio, placeOrder } = usePortfolioStore();
 
   const [loading, setLoading] = useState(true);
   const [timeFilter, setTimeFilter] = useState<TimeFilter>("1M");
@@ -110,11 +109,13 @@ export default function StockDetailPage() {
     };
   }, [targetSymbol, setContext, subscribe, unsubscribe]);
 
+  useEffect(() => {
+    fetchPortfolio();
+  }, [fetchPortfolio]);
+
   // Derived values
   const isPositive = (stock?.changePercent ?? 0) >= 0;
   const inWatchlist = stock ? isInWatchlist(stock.symbol) : false;
-  const lineData = chartData.map((d) => ({ time: d.time, value: d.close, volume: d.volume }));
-  const strokeColor = isPositive ? "#00d09c" : "#eb5b3c";
 
   const toggleWatchlist = () => {
     if (!stock) return;
@@ -129,12 +130,38 @@ export default function StockDetailPage() {
 
   const handleOrder = async () => {
     if (!stock || parseInt(qty) <= 0) { toast.error("Enter a valid quantity"); return; }
+    const qtyNum = parseInt(qty);
+    const total = qtyNum * stock.price;
+
+    if (orderType === "BUY" && (portfolio?.cashBalance ?? 0) < total) {
+      toast.error(`Insufficient funds. Need ${formatCurrency(total)}, have ${formatCurrency(portfolio?.cashBalance ?? 0)}`);
+      return;
+    }
+    if (orderType === "SELL") {
+      const holding = portfolio?.holdings?.find(h => h.symbol === stock.symbol);
+      if (!holding || holding.qty < qtyNum) {
+        toast.error(`Insufficient shares. You own ${holding?.qty ?? 0} shares.`);
+        return;
+      }
+    }
+
     setOrderLoading(true);
-    await new Promise((r) => setTimeout(r, 1200));
-    setOrderLoading(false);
-    toast.success(`✅ ${orderType} ${qty} shares of ${stock.symbol}`, {
-      description: `@ ${formatCurrency(stock.price)} · Total: ${formatCurrency(parseInt(qty) * stock.price)}`,
+    const ok = await placeOrder({
+      type: orderType,
+      symbol: stock.symbol,
+      name: stock.name,
+      exchange: stock.exchange,
+      sector: stock.sector,
+      qty: qtyNum,
+      price: stock.price,
     });
+    setOrderLoading(false);
+
+    if (ok) {
+      toast.success(`✅ ${orderType} ${qty} shares of ${stock.symbol}`, {
+        description: `@ ${formatCurrency(stock.price)} · Total: ${formatCurrency(total)}`,
+      });
+    }
   };
 
   if (!loading && !stock) {
@@ -261,49 +288,15 @@ export default function StockDetailPage() {
               </div>
             </div>
 
-            {loading && chartData.length === 0 ? <ChartSkeleton height={260} /> : (
-              chartType === "area" ? (
-                <ResponsiveContainer width="100%" height={260}>
-                  <AreaChart data={lineData}>
-                    <defs>
-                      <linearGradient id="sg" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="5%" stopColor={strokeColor} stopOpacity={0.15} />
-                        <stop offset="95%" stopColor={strokeColor} stopOpacity={0} />
-                      </linearGradient>
-                    </defs>
-                    <CartesianGrid strokeDasharray="3 3" className="opacity-10" vertical={false} />
-                    <XAxis dataKey="time" tick={{ fontSize: 10 }} axisLine={false} tickLine={false}
-                      tickFormatter={(v) => { const d = new Date(v); return `${d.getDate()}/${d.getMonth()+1}`; }}
-                      interval="preserveStartEnd" />
-                    <YAxis domain={["auto","auto"]} tickFormatter={(v) => `$${v.toFixed(0)}`} tick={{ fontSize: 10 }} axisLine={false} tickLine={false} width={60} />
-                    <Tooltip formatter={(v: any) => [formatCurrency(v), "Price"]} contentStyle={{ background: "var(--card)", border: "1px solid var(--border)", borderRadius: "10px", fontSize: "12px" }} />
-                    <Area type="monotone" dataKey="value" stroke={strokeColor} strokeWidth={2} fill="url(#sg)" dot={false} />
-                  </AreaChart>
-                </ResponsiveContainer>
-              ) : (
-                <ResponsiveContainer width="100%" height={260}>
-                  <ComposedChart data={chartData}>
-                    <CartesianGrid strokeDasharray="3 3" className="opacity-10" vertical={false} />
-                    <XAxis dataKey="time" tick={{ fontSize: 10 }} axisLine={false} tickLine={false} tickFormatter={(v) => { const d = new Date(v); return `${d.getDate()}/${d.getMonth()+1}`; }} interval="preserveStartEnd" />
-                    <YAxis domain={["auto","auto"]} tickFormatter={(v) => `$${v.toFixed(0)}`} tick={{ fontSize: 10 }} axisLine={false} tickLine={false} width={60} />
-                    <Tooltip formatter={(v: any, n: any) => [formatCurrency(v), n]} contentStyle={{ background: "var(--card)", border: "1px solid var(--border)", borderRadius: "10px", fontSize: "11px" }} />
-                    <Bar dataKey="low" fill="transparent" />
-                    <Bar dataKey="high" fill={`${strokeColor}55`} stackId="c" />
-                    <Line type="linear" dataKey="close" stroke={strokeColor} strokeWidth={1.5} dot={false} />
-                  </ComposedChart>
-                </ResponsiveContainer>
-              )
+            {loading && chartData.length === 0 ? (
+              <ChartSkeleton height={320} />
+            ) : (
+              <TradingChart 
+                data={chartData} 
+                type={chartType === "candlestick" ? "candlestick" : "area"} 
+                height={320} 
+              />
             )}
-
-            {/* Volume bar */}
-            <div className="mt-3 border-t border-border pt-3">
-              <p className="text-[10px] text-muted-foreground mb-1.5">Volume</p>
-              <ResponsiveContainer width="100%" height={40}>
-                <BarChart data={lineData}>
-                  <Bar dataKey="volume" fill={`${strokeColor}50`} radius={[2,2,0,0]} />
-                </BarChart>
-              </ResponsiveContainer>
-            </div>
           </div>
 
           {/* Tabs */}
@@ -412,6 +405,25 @@ export default function StockDetailPage() {
                     <Input type="number" min="1" value={qty} onChange={(e) => setQty(e.target.value)} className="mt-1.5 h-10" />
                   </div>
 
+                  {/* Balance / Shares info */}
+                  {portfolio && (
+                    <div className="flex items-center justify-between py-2 px-3 bg-muted/30 rounded-lg border border-border/50">
+                      {orderType === "BUY" ? (
+                        <>
+                          <span className="text-[10px] text-muted-foreground">Available Cash</span>
+                          <span className="text-xs font-bold num text-bull">{formatCurrency(portfolio.cashBalance)}</span>
+                        </>
+                      ) : (
+                        <>
+                          <span className="text-[10px] text-muted-foreground">Shares Owned</span>
+                          <span className="text-xs font-bold num">
+                            {portfolio.holdings?.find(h => h.symbol === stock.symbol)?.qty ?? 0} shares
+                          </span>
+                        </>
+                      )}
+                    </div>
+                  )}
+
                   <div className="flex items-center justify-between py-2.5 px-3 bg-muted/50 rounded-lg">
                     <span className="text-xs text-muted-foreground">Order Value</span>
                     <span className="text-sm font-bold num">{formatCurrency(parseInt(qty || "0") * stock.price)}</span>
@@ -430,7 +442,7 @@ export default function StockDetailPage() {
                       : `${orderType} ${stock.symbol}`
                     }
                   </button>
-                  <p className="text-[10px] text-muted-foreground text-center">Simulated — no real money involved</p>
+                  <p className="text-[10px] text-muted-foreground text-center">Paper trading — no real money involved</p>
                 </div>
               </div>
 

@@ -1,4 +1,5 @@
 "use client";
+import Image from "next/image";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useState, Suspense } from "react";
@@ -86,11 +87,16 @@ function SignupContent() {
       <div className="w-full max-w-sm">
         {/* Brand */}
         <div className="flex items-center justify-center gap-2.5 mb-10">
-          <div className="w-9 h-9 rounded-lg bg-primary flex items-center justify-center">
-            <span className="text-white font-black text-lg">G</span>
-          </div>
+          <Image
+            src="/logo.png"
+            alt="TradeIQ Logo"
+            width={36}
+            height={36}
+            className="object-contain"
+            priority
+          />
           <span className="font-bold text-xl tracking-tight">
-            Trade<span className="text-primary">IQ</span>
+            TradeIQ
           </span>
         </div>
 

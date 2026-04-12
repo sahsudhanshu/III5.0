@@ -47,7 +47,7 @@ export function ChartSkeleton({ height = 300 }: { height?: number }) {
 export function NewsCardSkeleton() {
   return (
     <div className="flex gap-3 p-3 border border-border rounded-xl">
-      <Skeleton className="w-16 h-16 rounded-lg flex-shrink-0" />
+      <Skeleton className="w-16 h-16 rounded-lg shrink-0" />
       <div className="flex-1 space-y-2">
         <Skeleton className="h-4 w-full" />
         <Skeleton className="h-4 w-3/4" />

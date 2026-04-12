@@ -11,6 +11,10 @@ export const metadata: Metadata = {
     "A professional-grade smart trading and portfolio management platform for US equity markets. Real-time market data, AI-powered insights, and beautiful analytics.",
   keywords: ["trading", "stocks", "NASDAQ", "portfolio", "investment", "US market", "NYSE"],
   authors: [{ name: "TradeIQ Team" }],
+  icons: {
+    icon: [{ url: "/favicon.ico?v=20260412" }],
+    apple: [{ url: "/logo.png" }],
+  },
 };
 
 export const viewport: Viewport = {

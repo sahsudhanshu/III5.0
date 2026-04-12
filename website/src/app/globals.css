@@ -252,6 +252,15 @@
     background: var(--primary);
     border-radius: 8px 8px 0 0;
   }
+
+  /* Scrollbar none */
+  .scrollbar-none::-webkit-scrollbar { display: none; }
+  .scrollbar-none { -ms-overflow-style: none; scrollbar-width: none; }
+
+  /* Safe area bottom (for iPhone home indicator) */
+  .safe-area-bottom {
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
 }
 
 /* ============================================================

@@ -34,14 +34,14 @@ export default function NewsPage() {
     .filter((n) => sentiment === "All" || n.sentiment === sentiment);
 
   return (
-    <div className="p-6 space-y-6">
+    <div className="px-3 sm:px-4 lg:px-6 py-4 sm:py-6 space-y-5 sm:space-y-6 max-w-[1700px] mx-auto">
       <div>
         <h1 className="text-2xl font-bold">Market News</h1>
         <p className="text-muted-foreground text-sm">Live updates — search any stock, sector, or topic</p>
       </div>
 
       {/* Filters */}
-      <div className="flex flex-col sm:flex-row gap-3">
+      <div className="flex flex-col sm:flex-row gap-3 sm:items-center">
         <div className="relative flex-1 max-w-sm">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
           <Input
@@ -54,7 +54,7 @@ export default function NewsPage() {
             <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground animate-spin" />
           )}
         </div>
-        <div className="flex gap-1.5">
+        <div className="flex gap-1.5 flex-wrap">
           {SENTIMENTS.map((s) => (
             <Button
               key={s}
@@ -141,7 +141,9 @@ export default function NewsPage() {
               )}
 
               <div className="flex items-center justify-between mt-auto pt-2 border-t border-border">
-                <span className="text-[10px] text-muted-foreground">{article.published}</span>
+                <span className="text-[10px] text-muted-foreground">
+                  {new Date(article.published).toLocaleDateString("en-US", { year: "numeric", month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" })}
+                </span>
                 <ExternalLink className="w-3 h-3 text-muted-foreground group-hover:text-primary transition-colors" />
               </div>
             </div>

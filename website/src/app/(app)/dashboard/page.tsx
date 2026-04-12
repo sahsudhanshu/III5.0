@@ -47,21 +47,28 @@ export default function DashboardPage() {
   }, [fetchPortfolio, isAuthenticated]);
 
   useEffect(() => {
+    let mounted = true;
     async function loadUniverse() {
+      if (!mounted) return;
       setLoading(true);
-      for (const symbol of INITIAL_UNIVERSE) {
+      
+      const holdingSymbols = portfolio?.holdings?.map((h) => h.symbol) || [];
+      const symbolsToLoad = Array.from(new Set([...INITIAL_UNIVERSE, ...holdingSymbols]));
+
+      for (const symbol of symbolsToLoad) {
+        if (!mounted) return;
         await fetchStockProfile(symbol);
         await new Promise(r => setTimeout(r, 100)); // Rate limit safety
       }
-      setLoading(false);
+      if (mounted) setLoading(false);
     }
-    const missing = INITIAL_UNIVERSE.some(sym => !stocks[sym]);
-    if (missing) {
-      loadUniverse();
-    } else {
-      setTimeout(() => setLoading(false), 0);
-    }
-  }, [fetchStockProfile, stocks]);
+    
+    loadUniverse();
+    
+    return () => {
+      mounted = false;
+    };
+  }, [fetchStockProfile, portfolio?.holdings]);
 
   const holdings = useMemo(() => {
     const source = portfolio?.holdings ?? [];
@@ -383,7 +390,7 @@ export default function DashboardPage() {
                 className="flex items-center gap-2.5 py-2 px-2 rounded-lg hover:bg-muted/50 cursor-pointer transition-colors"
                 onClick={() => router.push(`/explore/${h.symbol}`)}
               >
-                <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
+                <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
                   <span className="text-[9px] font-black text-primary">{h.symbol.slice(0,2)}</span>
                 </div>
                 <div className="flex-1 min-w-0">
@@ -461,7 +468,7 @@ export default function DashboardPage() {
               {sectorAllocation.map((s) => (
                 <div key={s.sector} className="flex items-center justify-between">
                   <div className="flex items-center gap-1.5">
-                    <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: s.color }} />
+                    <span className="w-2 h-2 rounded-full shrink-0" style={{ background: s.color }} />
                     <span className="text-[11px] text-muted-foreground">{s.sector}</span>
                   </div>
                   <span className="text-[11px] font-semibold num">{s.percentage.toFixed(1)}%</span>
@@ -496,7 +503,7 @@ export default function DashboardPage() {
           <div className={cn("space-y-2", !isAuthenticated && "opacity-20 blur-[2px]")}>
             {recentOrders.map((t) => (
               <div key={t.id} className="flex items-center gap-3 py-2 px-2 rounded-lg hover:bg-muted/50 transition-colors">
-                <div className={cn("w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0", t.type === "BUY" ? "bg-bull-muted" : "bg-bear-muted")}>
+                <div className={cn("w-8 h-8 rounded-full flex items-center justify-center shrink-0", t.type === "BUY" ? "bg-bull-muted" : "bg-bear-muted")}>
                   {t.type === "BUY"
                     ? <ArrowDownRight className="w-4 h-4 text-bull" />
                     : <ArrowUpRight className="w-4 h-4 text-bear" />}
@@ -508,7 +515,7 @@ export default function DashboardPage() {
                   </div>
                   <p className="text-[10px] text-muted-foreground">{t.qty ?? 0} × {formatCurrency(t.price ?? 0)}</p>
                 </div>
-                <div className="text-right flex-shrink-0">
+                <div className="text-right shrink-0">
                   <p className={cn("text-xs font-bold num", t.type === "BUY" ? "text-bear" : "text-bull")}>
                     {t.amount < 0 ? "-" : "+"}{formatCurrency(Math.abs(t.amount))}
                   </p>

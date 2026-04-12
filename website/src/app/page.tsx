@@ -1,4 +1,5 @@
 "use client";
+import Image from "next/image";
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { INITIAL_UNIVERSE, useDataStore } from "@/store/data-store";
@@ -11,7 +12,19 @@ export default function RootPage() {
   const { stocks, fetchStockProfile } = useDataStore();
   const { articles, refresh, loading } = useNews("market", 6);
   const [activeInsight, setActiveInsight] = useState(0);
-  const [marketTime, setMarketTime] = useState(new Date());
+  const [marketTime, setMarketTime] = useState<Date | null>(null);
+  const [isInitialLoading, setIsInitialLoading] = useState(true);
+
+  useEffect(() => {
+    const initTimer = setTimeout(() => setMarketTime(new Date()), 0);
+    const timer = setInterval(() => setActiveInsight((v) => (v + 1) % 3), 3500);
+    const clock = setInterval(() => setMarketTime(new Date()), 1000);
+    return () => {
+      clearTimeout(initTimer);
+      clearInterval(timer);
+      clearInterval(clock);
+    };
+  }, []);
 
   useEffect(() => {
     let mounted = true;
@@ -22,6 +35,9 @@ export default function RootPage() {
         await fetchStockProfile(symbol);
         await new Promise((r) => setTimeout(r, 90));
       }
+      if (mounted) {
+        setIsInitialLoading(false);
+      }
     };
 
     load();
@@ -30,14 +46,7 @@ export default function RootPage() {
     };
   }, [fetchStockProfile]);
 
-  useEffect(() => {
-    const timer = setInterval(() => setActiveInsight((v) => (v + 1) % 3), 3500);
-    const clock = setInterval(() => setMarketTime(new Date()), 1000);
-    return () => {
-      clearInterval(timer);
-      clearInterval(clock);
-    };
-  }, []);
+
 
   const liveStocks = useMemo(
     () => INITIAL_UNIVERSE.map((s) => stocks[s]).filter(Boolean).slice(0, 8),
@@ -64,10 +73,35 @@ export default function RootPage() {
 
   return (
     <div className="min-h-screen bg-background text-foreground">
+      {/* Full-screen Loading Overlay */}
+      {isInitialLoading && (
+        <div className="fixed inset-0 z-100 bg-background flex flex-col items-center justify-center animate-out fade-out duration-500 fill-mode-forwards" style={{ animationDelay: isInitialLoading ? "0s" : "0.5s" }}>
+          <Image
+            src="/logo.png"
+            alt="TradeIQ Logo"
+            width={80}
+            height={80}
+            className="object-contain animate-pulse mb-6"
+            priority
+          />
+          <div className="flex items-center gap-3">
+            <div className="w-5 h-5 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+            <p className="text-sm font-semibold text-muted-foreground animate-pulse">Initializing Data Terminal...</p>
+          </div>
+        </div>
+      )}
+
       <header className="sticky top-0 z-40 backdrop-blur-xl bg-background/85 border-b border-border">
         <div className="max-w-[1280px] mx-auto px-4 lg:px-8 h-16 flex items-center justify-between">
           <Link href="/" className="flex items-center gap-2">
-            <div className="w-8 h-8 rounded-full bg-gradient-to-br from-primary to-chart-2" />
+            <Image
+              src="/logo.png"
+              alt="TradeIQ Logo"
+              width={32}
+              height={32}
+              className="object-contain"
+              priority
+            />
             <span className="text-2xl font-extrabold tracking-tight">TradeIQ</span>
           </Link>
 
@@ -93,7 +127,7 @@ export default function RootPage() {
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
             <div className="flex items-center gap-2 text-muted-foreground">
               <Sparkles className="w-3.5 h-3.5 text-primary" />
-              Market Clock: <span className="font-semibold text-foreground">{marketTime.toLocaleTimeString("en-US")}</span>
+              Market Clock: <span className="font-semibold text-foreground">{marketTime ? marketTime.toLocaleTimeString("en-US") : "--:--:--"}</span>
             </div>
             <button
               onClick={() => refresh()}

@@ -1,4 +1,5 @@
 "use client";
+import Image from "next/image";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useState, useEffect, useRef } from "react";
@@ -19,28 +20,35 @@ import {
 import { useDataStore, INITIAL_UNIVERSE } from "@/store/data-store";
 import {
   Search, Bell, Sun, Moon, Bot,
-  ChevronDown, X
+  ChevronDown, X,
+  LayoutDashboard, Compass, BarChart2, Receipt, Newspaper, Star, Share2,
 } from "lucide-react";
 import { useRequireAuth } from "@/hooks/use-require-auth";
 import { useAppTheme } from "@/hooks/use-app-theme";
 
 // ── Primary nav items (Groww style) ──
 const NAV_ITEMS = [
-  { href: "/dashboard", label: "Dashboard" },
-  { href: "/explore", label: "Explore" },
-  { href: "/portfolio", label: "Portfolio" },
-  { href: "/transactions", label: "Transactions" },
-  { href: "/news", label: "News" },
-  { href: "/watchlist", label: "Watchlist" },
+  { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
+  { href: "/explore", label: "Explore", icon: Compass },
+  { href: "/portfolio", label: "Portfolio", icon: BarChart2 },
+  { href: "/smart-graph", label: "Smart Graph", icon: Share2 },
+  { href: "/transactions", label: "Transactions", icon: Receipt },
+  { href: "/news", label: "News", icon: Newspaper },
+  { href: "/watchlist", label: "Watchlist", icon: Star },
 ];
 
 // ── Company brand ──
 function GrowwLogo() {
   return (
-    <Link href="/dashboard" className="flex items-center gap-2 flex-shrink-0">
-      <div className="w-8 h-8 rounded-lg bg-primary flex items-center justify-center">
-        <span className="text-white font-black text-sm">G</span>
-      </div>
+    <Link href="/dashboard" className="flex items-center gap-2 shrink-0">
+      <Image
+        src="/logo.png"
+        alt="TradeIQ Logo"
+        width={32}
+        height={32}
+        className="object-contain"
+        priority
+      />
       <span className="font-bold text-lg text-foreground hidden sm:block tracking-tight">
         Trade<span className="text-primary">IQ</span>
       </span>
@@ -100,16 +108,16 @@ function SearchBar() {
     <div ref={containerRef} className="relative w-full max-w-xs lg:max-w-sm xl:max-w-md">
       {/* Inline input */}
       <div className="flex items-center gap-2 h-9 px-3 rounded-lg bg-muted text-muted-foreground text-sm transition-colors">
-        <Search className="w-3.5 h-3.5 flex-shrink-0" />
+        <Search className="w-3.5 h-3.5 shrink-0" />
         <input
           ref={inputRef}
           className="flex-1 bg-transparent text-sm outline-none placeholder:text-muted-foreground text-foreground"
-          placeholder="Search stocks, ETFs…"
+          placeholder="Search stocks..."
           value={query}
           onChange={e => { setQuery(e.target.value); setOpen(true); }}
           onFocus={() => setOpen(true)}
         />
-        <div className="hidden sm:flex items-center justify-end w-14 flex-shrink-0">
+        <div className="hidden sm:flex items-center justify-end w-14 shrink-0">
           {query ? (
             <button onClick={() => { setQuery(""); inputRef.current?.focus(); }}>
               <X className="w-3.5 h-3.5 hover:text-foreground transition-colors" />
@@ -138,7 +146,7 @@ function SearchBar() {
                   onClick={() => { router.push(`/explore/${s.symbol}`); setOpen(false); setQuery(""); }}
                 >
                   <div className="flex items-center gap-2.5">
-                    <div className="w-7 h-7 rounded-md bg-primary/10 flex items-center justify-center flex-shrink-0">
+                    <div className="w-7 h-7 rounded-md bg-primary/10 flex items-center justify-center shrink-0">
                       <span className="text-[9px] font-bold text-primary">{s.symbol.slice(0, 2)}</span>
                     </div>
                     <div>
@@ -146,7 +154,7 @@ function SearchBar() {
                       <p className="text-[11px] text-muted-foreground truncate max-w-[160px]">{s.name}</p>
                     </div>
                   </div>
-                  <div className="text-right flex-shrink-0 ml-2">
+                  <div className="text-right shrink-0 ml-2">
                     <p className="text-sm font-semibold num text-foreground">{formatCurrency(s.price)}</p>
                     <p className={cn("text-[11px] num font-medium", s.changePercent >= 0 ? "text-bull" : "text-bear")}>
                       {s.changePercent >= 0 ? "+" : ""}{formatPercent(s.changePercent)}
@@ -194,7 +202,7 @@ function MarketTicker() {
         changePercent: 0,
         currentPrice: 0,
         isUp: false,
-        live: false
+        live: false,
       };
     }
     const finnhubSymbol = symbol === "BTC" ? "BINANCE:BTCUSDT" : symbol;
@@ -209,7 +217,7 @@ function MarketTicker() {
   });
 
   return (
-    <div className="flex items-center gap-4 overflow-hidden w-[32rem] flex-shrink-0">
+    <div className="flex items-center gap-4 overflow-hidden w-[28rem] 2xl:w-[32rem] flex-shrink-0">
       <div className="flex items-center gap-4 animate-ticker w-max">
         {[...displayStocks, ...displayStocks].map((s, i) => (
           <Link
@@ -250,131 +258,153 @@ export function Navbar() {
   };
 
   return (
-    <header className="sticky top-0 z-30 bg-card border-b border-border">
-      {/* ── Top bar ── */}
-      <div className="flex items-center gap-3 px-4 lg:px-6 h-14">
-        {/* Logo */}
-        <GrowwLogo />
+    <>
+      {/* ── Fixed Top Header ── */}
+      <header className="fixed top-0 left-0 right-0 z-50 bg-card border-b border-border">
+        {/* ── Top bar ── */}
+        <div className="flex items-center gap-2 sm:gap-3 px-3 sm:px-4 lg:px-6 h-14">
+          {/* Logo */}
+          <GrowwLogo />
 
-        {/* Ticker - increased width */}
-        <div className="hidden md:flex ml-6">
-          <MarketTicker />
-        </div>
+          {/* Ticker - increased width */}
+          <div className="hidden lg:flex ml-4">
+            <MarketTicker />
+          </div>
 
-        {/* Spacer */}
-        <div className="flex-1" />
+          {/* Search — right side */}
+          <div className="flex-1 min-w-0 px-1 sm:px-2">
+            <SearchBar />
+          </div>
 
-        {/* Search — right side */}
-        <div className="flex items-center px-2">
-          <SearchBar />
-        </div>
-
-        {/* Right actions */}
-        <div className="flex items-center gap-1 flex-shrink-0">
-          {/* AI Assistant */}
-          <button
-            onClick={() => requireAuth(toggleChat, "Sign in to use AI predictions, sentiment, and recommendations")}
-            className="relative flex items-center justify-center w-8 h-8 rounded-lg hover:bg-muted transition-colors"
-            title="AI Assistant"
-          >
-            <Bot className="w-4 h-4 text-muted-foreground" />
-            <span className="absolute top-1.5 right-1.5 w-1.5 h-1.5 rounded-full bg-primary" />
-          </button>
-
-          {/* Notifications */}
-          <button className="relative flex items-center justify-center w-8 h-8 rounded-lg hover:bg-muted transition-colors">
-            <Bell className="w-4 h-4 text-muted-foreground" />
-            <span className="absolute top-1 right-1 min-w-[14px] h-3.5 rounded-full bg-bear text-white text-[8px] font-bold flex items-center justify-center px-0.5">
-              3
-            </span>
-          </button>
-
-          {/* Theme */}
-          {mounted && (
+          {/* Right actions */}
+          <div className="flex items-center gap-0.5 sm:gap-1 shrink-0">
+            {/* AI Assistant */}
             <button
-              onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
-              className="flex items-center justify-center w-8 h-8 rounded-lg hover:bg-muted transition-colors"
+              onClick={() => requireAuth(toggleChat, "Sign in to use AI predictions, sentiment, and recommendations")}
+              className="relative flex items-center justify-center w-8 h-8 rounded-lg hover:bg-muted transition-colors"
+              title="AI Assistant"
             >
-              {theme === "dark"
-                ? <Sun className="w-4 h-4 text-muted-foreground" />
-                : <Moon className="w-4 h-4 text-muted-foreground" />}
+              <Bot className="w-4 h-4 text-muted-foreground" />
+              <span className="absolute top-1.5 right-1.5 w-1.5 h-1.5 rounded-full bg-primary" />
             </button>
-          )}
 
-          {/* User */}
-          <DropdownMenu>
-            <DropdownMenuTrigger className="flex items-center gap-1.5 h-8 px-2 rounded-lg hover:bg-muted transition-colors">
-              <Avatar className="h-6 w-6">
-                <AvatarFallback className="text-[10px] bg-primary text-primary-foreground font-bold">
-                  {user?.name?.split(" ").map((n) => n[0]).join("") ?? "U"}
-                </AvatarFallback>
-              </Avatar>
-              <ChevronDown className="w-3 h-3 text-muted-foreground" />
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-52">
-              <DropdownMenuGroup>
-                <DropdownMenuLabel>
+            {/* Notifications */}
+            <button className="relative flex items-center justify-center w-8 h-8 rounded-lg hover:bg-muted transition-colors">
+              <Bell className="w-4 h-4 text-muted-foreground" />
+              <span className="absolute top-1 right-1 min-w-[14px] h-3.5 rounded-full bg-bear text-white text-[8px] font-bold flex items-center justify-center px-0.5">
+                3
+              </span>
+            </button>
+
+            {/* Theme */}
+            {mounted && (
+              <button
+                onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
+                className="hidden sm:flex items-center justify-center w-8 h-8 rounded-lg hover:bg-muted transition-colors"
+              >
+                {theme === "dark"
+                  ? <Sun className="w-4 h-4 text-muted-foreground" />
+                  : <Moon className="w-4 h-4 text-muted-foreground" />}
+              </button>
+            )}
+
+            {/* User */}
+            <DropdownMenu>
+              <DropdownMenuTrigger className="flex items-center gap-1.5 h-8 px-1.5 sm:px-2 rounded-lg hover:bg-muted transition-colors">
+                <Avatar className="h-6 w-6">
+                  <AvatarFallback className="text-[10px] bg-primary text-primary-foreground font-bold">
+                    {user?.name?.split(" ").map((n) => n[0]).join("") ?? "U"}
+                  </AvatarFallback>
+                </Avatar>
+                <ChevronDown className="w-3 h-3 text-muted-foreground hidden sm:block" />
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-52">
+                <DropdownMenuGroup>
+                  <DropdownMenuLabel>
+                    {status === "authenticated" ? (
+                      <>
+                        <p className="font-semibold text-foreground text-sm">{user?.name}</p>
+                        <p className="text-xs text-muted-foreground font-normal mt-0.5">{user?.email}</p>
+                      </>
+                    ) : (
+                      <>
+                        <p className="font-semibold text-foreground text-sm">Guest</p>
+                        <p className="text-xs text-muted-foreground font-normal mt-0.5">Sign in to unlock personalized features</p>
+                      </>
+                    )}
+                  </DropdownMenuLabel>
+                </DropdownMenuGroup>
+                <DropdownMenuSeparator />
+                <DropdownMenuGroup>
+                  <DropdownMenuItem onClick={() => router.push("/dashboard")}>Dashboard</DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => router.push("/portfolio")}>Portfolio</DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => router.push("/settings")}>Settings</DropdownMenuItem>
+                </DropdownMenuGroup>
+                <DropdownMenuSeparator />
+                <DropdownMenuGroup>
                   {status === "authenticated" ? (
-                    <>
-                      <p className="font-semibold text-foreground text-sm">{user?.name}</p>
-                      <p className="text-xs text-muted-foreground font-normal mt-0.5">{user?.email}</p>
-                    </>
+                    <DropdownMenuItem onClick={handleLogout} className="text-destructive">
+                      Log out
+                    </DropdownMenuItem>
                   ) : (
                     <>
-                      <p className="font-semibold text-foreground text-sm">Guest</p>
-                      <p className="text-xs text-muted-foreground font-normal mt-0.5">Sign in to unlock personalized features</p>
+                      <DropdownMenuItem onClick={() => router.push(`/auth/login?callbackUrl=${encodeURIComponent(pathname)}`)}>                        Sign in
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onClick={() => router.push(`/auth/signup?callbackUrl=${encodeURIComponent(pathname)}`)}>                        Create account
+                      </DropdownMenuItem>
                     </>
                   )}
-                </DropdownMenuLabel>
-              </DropdownMenuGroup>
-              <DropdownMenuSeparator />
-              <DropdownMenuGroup>
-                <DropdownMenuItem onClick={() => router.push("/dashboard")}>Dashboard</DropdownMenuItem>
-                <DropdownMenuItem onClick={() => router.push("/portfolio")}>Portfolio</DropdownMenuItem>
-                <DropdownMenuItem onClick={() => router.push("/settings")}>Settings</DropdownMenuItem>
-              </DropdownMenuGroup>
-              <DropdownMenuSeparator />
-              <DropdownMenuGroup>
-                {status === "authenticated" ? (
-                  <DropdownMenuItem onClick={handleLogout} className="text-destructive">
-                    Log out
-                  </DropdownMenuItem>
-                ) : (
-                  <>
-                    <DropdownMenuItem onClick={() => router.push(`/auth/login?callbackUrl=${encodeURIComponent(pathname)}`)}>
-                      Sign in
-                    </DropdownMenuItem>
-                    <DropdownMenuItem onClick={() => router.push(`/auth/signup?callbackUrl=${encodeURIComponent(pathname)}`)}>
-                      Create account
-                    </DropdownMenuItem>
-                  </>
-                )}
-              </DropdownMenuGroup>
-            </DropdownMenuContent>
-          </DropdownMenu>
+                </DropdownMenuGroup>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
         </div>
-      </div>
 
-      {/* ── Bottom nav tabs (Groww style) ── */}
-      <nav className="flex items-center gap-1 px-6 lg:px-10 overflow-x-auto scrollbar-none">
-        {NAV_ITEMS.map(({ href, label }) => {
-          const isActive = pathname === href || pathname.startsWith(href + "/");
-          return (
-            <Link
-              key={href}
-              href={href}
-              className={cn(
-                "relative flex items-center h-11 px-5 lg:px-6 text-sm font-medium whitespace-nowrap transition-colors border-b-2 -mb-px rounded-t-md",
-                isActive
-                  ? "text-primary border-primary"
-                  : "text-muted-foreground border-transparent hover:text-foreground hover:border-border"
-              )}
-            >
-              {label}
-            </Link>
-          );
-        })}
+        {/* ── Desktop bottom nav tabs (hidden on mobile) ── */}
+        <nav className="hidden md:flex items-center gap-1 px-3 sm:px-4 lg:px-6 overflow-x-auto [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
+          {NAV_ITEMS.map(({ href, label }) => {
+            const isActive = pathname === href || pathname.startsWith(href + "/");
+            return (
+              <Link
+                key={href}
+                href={href}
+                className={cn(
+                  "relative flex items-center h-11 px-5 lg:px-6 text-sm font-medium whitespace-nowrap transition-colors border-b-2 -mb-px rounded-t-md",
+                  isActive
+                    ? "text-primary border-primary"
+                    : "text-muted-foreground border-transparent hover:text-foreground hover:border-border"
+                )}
+              >
+                {label}
+              </Link>
+            );
+          })}
+        </nav>
+      </header>
+
+      {/* ── Mobile bottom tab bar (visible only on small screens) ── */}
+      <nav className="fixed bottom-0 left-0 right-0 z-50 md:hidden bg-card border-t border-border safe-area-bottom">
+        <div className="flex items-center justify-around h-14">
+          {NAV_ITEMS.map(({ href, label, icon: Icon }) => {
+            const isActive = pathname === href || pathname.startsWith(href + "/");
+            return (
+              <Link
+                key={href}
+                href={href}
+                className={cn(
+                  "flex flex-col items-center justify-center gap-0.5 flex-1 h-full transition-colors",
+                  isActive
+                    ? "text-primary"
+                    : "text-muted-foreground"
+                )}
+              >
+                <Icon className="w-5 h-5" />
+                <span className="text-[10px] font-medium leading-none">{label}</span>
+              </Link>
+            );
+          })}
+        </div>
       </nav>
-    </header>
+    </>
   );
 }

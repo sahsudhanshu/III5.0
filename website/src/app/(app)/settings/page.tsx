@@ -11,7 +11,7 @@ export default function SettingsPage() {
   const { theme, setTheme } = useAppTheme();
 
   return (
-    <div className="p-6 space-y-6 max-w-2xl">
+    <div className="px-3 sm:px-4 lg:px-6 py-4 sm:py-6 space-y-5 sm:space-y-6 max-w-2xl mx-auto">
       <div>
         <h1 className="text-2xl font-bold">Settings</h1>
         <p className="text-muted-foreground text-sm">Manage your account and preferences</p>
@@ -42,7 +42,7 @@ export default function SettingsPage() {
           <Sun className="w-4 h-4 text-primary" />
           <h2 className="font-semibold">Appearance</h2>
         </div>
-        <div className="flex gap-3">
+        <div className="flex flex-col sm:flex-row gap-3">
           {(["light", "dark"] as const).map((t) => (
             <button
               key={t}

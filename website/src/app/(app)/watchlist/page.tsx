@@ -70,7 +70,7 @@ export default function WatchlistPage() {
 
   if (!isAuthenticated) {
     return (
-      <div className="p-6 max-w-screen-xl mx-auto flex flex-col items-center justify-center min-h-[60vh] text-center">
+      <div className="p-6 max-w-7xl mx-auto flex flex-col items-center justify-center min-h-[60vh] text-center">
         <div className="w-20 h-20 bg-muted rounded-full flex items-center justify-center mb-6">
           <Star className="w-10 h-10 text-muted-foreground/50" />
         </div>
@@ -89,8 +89,8 @@ export default function WatchlistPage() {
   }
 
   return (
-    <div className="p-6 space-y-6">
-      <div className="flex items-center justify-between">
+    <div className="px-3 sm:px-4 lg:px-6 py-4 sm:py-6 space-y-5 sm:space-y-6 max-w-[1700px] mx-auto">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <div>
           <h1 className="text-2xl font-bold">Watchlist</h1>
           <p className="text-muted-foreground text-sm">{items.length} stocks being tracked</p>

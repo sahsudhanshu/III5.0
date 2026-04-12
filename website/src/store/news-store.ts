@@ -1,7 +1,6 @@
 "use client";
 import { useEffect, useState } from "react";
 import { create } from "zustand";
-import { MOCK_NEWS } from "@/lib/mock-data";
 
 const NEWS_API_BASE = process.env.NEXT_PUBLIC_NEWS_API_BASE ?? "/api/news";
 const STALE_MS = 5 * 60 * 1000; // 5 minutes cache TTL
@@ -62,30 +61,7 @@ function normalizeApiArticles(input: unknown): NewsArticle[] {
   return articles;
 }
 
-function fallbackNews(query: string, limit: number): NewsArticle[] {
-  const q = query.trim().toLowerCase();
 
-  const mapped: NewsArticle[] = MOCK_NEWS.map((n) => ({
-    title: n.title,
-    source: n.source,
-    summary: n.summary,
-    url: n.url,
-    published: n.publishedAt,
-    feedType: "fallback",
-    sentiment: n.sentiment,
-  }));
-
-  if (!q || q === "market" || q === "finance") {
-    return mapped.slice(0, limit);
-  }
-
-  const filtered = mapped.filter((n) => {
-    const text = `${n.title} ${n.summary} ${n.source}`.toLowerCase();
-    return text.includes(q);
-  });
-
-  return (filtered.length ? filtered : mapped).slice(0, limit);
-}
 
 export function cacheKey(query: string, limit: number) {
   return `${query.toLowerCase().trim()}:${limit}`;
@@ -118,21 +94,15 @@ export const useNewsStore = create<NewsState>()((set, get) => ({
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
 
       const data = await res.json();
-      let articles = normalizeApiArticles(data?.articles);
-
-      // Keep UX useful even when upstream returns empty payloads.
-      if (articles.length === 0) {
-        articles = fallbackNews(query, limit);
-      }
+      const articles = normalizeApiArticles(data?.articles);
 
       set((s) => ({
         cache: { ...s.cache, [key]: { articles, fetchedAt: Date.now() } },
         loading: { ...s.loading, [key]: false },
       }));
     } catch (err) {
-      const articles = fallbackNews(query, limit);
       set((s) => ({
-        cache: { ...s.cache, [key]: { articles, fetchedAt: Date.now() } },
+        cache: { ...s.cache, [key]: { articles: [], fetchedAt: Date.now() } },
         loading: { ...s.loading, [key]: false },
         errors: { ...s.errors, [key]: String(err) },
       }));

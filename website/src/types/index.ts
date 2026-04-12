@@ -139,6 +139,25 @@ export interface NewsArticle {
   imageUrl?: string;
 }
 
+// ---- AI Forecast ----
+export interface StockForecastItem {
+  date: string;
+  predictedPrice: number;
+  baselinePrice: number;
+  delta: number;
+  deltaPercent: number;
+}
+
+export interface StockForecastResponse {
+  symbol: string;
+  signal: "BULLISH" | "BEARISH" | "NEUTRAL";
+  confidence: number;
+  summary: string;
+  forecast: StockForecastItem[];
+  source: "hf" | "mock";
+  generatedAt: string;
+}
+
 // ---- AI Chat ----
 export type ChatRole = "user" | "assistant" | "system";
 

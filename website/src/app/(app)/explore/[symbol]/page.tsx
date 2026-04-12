@@ -2,7 +2,7 @@
 "use client";
 import { useEffect, useState, useCallback, useMemo } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { formatCurrency, formatPercent, formatNumber, cn } from "@/lib/utils";
+import { formatCurrency, formatPercent, formatNumber, formatDate, cn } from "@/lib/utils";
 import { generateCandlestickData } from "@/lib/mock-data";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -21,7 +21,7 @@ import {
   CandlestickChart, LineChart, Timer,
 } from "lucide-react";
 import { TradingChart } from "@/components/common/trading-chart";
-import type { TimeFilter, ChartType } from "@/types";
+import type { TimeFilter, ChartType, StockForecastResponse } from "@/types";
 
 const TIME_FILTERS: TimeFilter[] = ["1W", "1M", "3M", "6M"];
 
@@ -61,6 +61,8 @@ export default function StockDetailPage() {
   const [orderType, setOrderType] = useState<"BUY" | "SELL">("BUY");
   const [qty, setQty] = useState("10");
   const [orderLoading, setOrderLoading] = useState(false);
+  const [forecastLoading, setForecastLoading] = useState(false);
+  const [forecastData, setForecastData] = useState<StockForecastResponse | null>(null);
 
   // Determine actual target symbol
   const targetSymbol = typeof symbol === "string" ? symbol.toUpperCase() : "AAPL";
@@ -241,9 +243,32 @@ export default function StockDetailPage() {
     }, "Sign in to place buy or sell orders");
   };
 
+  const handleForecast = async () => {
+    if (!stock) return;
+    setForecastLoading(true);
+    try {
+      const res = await fetch("/api/stock-forecast", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ symbol: stock.symbol }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        toast.error(data?.message ?? "Unable to fetch forecast");
+        setForecastLoading(false);
+        return;
+      }
+      setForecastData(data as StockForecastResponse);
+    } catch (error) {
+      toast.error(`Forecast request failed: ${String(error)}`);
+    } finally {
+      setForecastLoading(false);
+    }
+  };
+
   if (!loading && !stock) {
     return (
-      <div className="p-6 max-w-screen-xl mx-auto flex flex-col items-center justify-center min-h-[50vh]">
+      <div className="px-3 sm:px-4 lg:px-6 py-6 max-w-7xl mx-auto flex flex-col items-center justify-center min-h-[50vh]">
         <h2 className="text-2xl font-bold mb-2">Stock Not Found</h2>
         <p className="text-muted-foreground mb-6">We couldn&apos;t load data for <strong>{targetSymbol}</strong>.</p>
         <Button onClick={() => router.back()} className="gap-2">
@@ -254,9 +279,9 @@ export default function StockDetailPage() {
   }
 
   return (
-    <div className="max-w-[1700px] mx-auto px-4 lg:px-6 py-6 font-geist">
+    <div className="max-w-[1700px] mx-auto px-3 sm:px-4 lg:px-6 py-4 sm:py-6 font-geist">
       {/* ── Breadcrumb ── */}
-      <div className="flex items-center gap-2 mb-6 text-sm text-muted-foreground">
+      <div className="flex flex-wrap items-center gap-2 mb-6 text-sm text-muted-foreground">
         <button onClick={() => router.back()} className="hover:text-foreground transition-colors flex items-center gap-1">
           <ArrowLeft className="w-3.5 h-3.5" /> Explore
         </button>
@@ -279,7 +304,7 @@ export default function StockDetailPage() {
               <>
                 <div className="flex flex-col sm:flex-row sm:items-start gap-4 justify-between">
                   <div className="flex items-center gap-3">
-                    <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
+                    <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
                       <span className="text-sm font-black text-primary">{stock.symbol.slice(0, 2)}</span>
                     </div>
                     <div>
@@ -373,7 +398,7 @@ export default function StockDetailPage() {
                 {candleRetryCountdown !== null && candleRetryCountdown > 0 && (
                   <div className="absolute inset-x-0 top-0 z-20 flex items-center justify-center">
                     <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-amber-500/10 border border-amber-500/30 text-amber-600 dark:text-amber-400 text-xs font-medium shadow-sm backdrop-blur-sm">
-                      <Timer className="w-3.5 h-3.5 animate-pulse flex-shrink-0" />
+                      <Timer className="w-3.5 h-3.5 animate-pulse shrink-0" />
                       <span>
                         Chart data rate-limited — fetching real data in{" "}
                         <span className="font-mono font-bold tabular-nums">{candleRetryCountdown}s</span>
@@ -417,7 +442,7 @@ export default function StockDetailPage() {
                     </div>
                     <div className="relative h-2 bg-muted rounded-full overflow-hidden">
                       <div
-                        className="absolute h-full rounded-full bg-gradient-to-r from-bear via-primary to-bull"
+                        className="absolute h-full rounded-full bg-linear-to-r from-bear via-primary to-bull"
                         style={{ width: "100%" }}
                       />
                       <div
@@ -562,12 +587,12 @@ export default function StockDetailPage() {
                             )}
                           >
                             {/* Rank number */}
-                            <span className="text-[10px] font-bold text-muted-foreground/40 w-4 flex-shrink-0 pt-0.5">{idx + 1}</span>
+                            <span className="text-[10px] font-bold text-muted-foreground/40 w-4 shrink-0 pt-0.5">{idx + 1}</span>
                             <div className="flex-1 min-w-0">
                               {/* Meta row */}
                               <div className="flex items-center gap-2 mb-1.5 flex-wrap">
                                 <span className={cn("inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold border", sentimentConfig.cls)}>
-                                  <span className={cn("w-1.5 h-1.5 rounded-full flex-shrink-0", sentimentConfig.dot)} />
+                                  <span className={cn("w-1.5 h-1.5 rounded-full shrink-0", sentimentConfig.dot)} />
                                   {n.sentiment}
                                 </span>
                                 <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold border border-border text-muted-foreground uppercase tracking-wide">
@@ -595,7 +620,7 @@ export default function StockDetailPage() {
                             </div>
                             {/* Article image */}
                             {n.imageUrl && (
-                              <div className="w-16 h-14 rounded-lg overflow-hidden flex-shrink-0 bg-muted">
+                              <div className="w-16 h-14 rounded-lg overflow-hidden shrink-0 bg-muted">
                                 {/* eslint-disable-next-line @next/next/no-img-element */}
                                 <img src={n.imageUrl} alt="" className="w-full h-full object-cover" onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }} />
                               </div>
@@ -661,7 +686,7 @@ export default function StockDetailPage() {
                         },
                       ].map((row) => (
                         <div key={row.label} className="flex items-center gap-3">
-                          <span className="text-xs text-muted-foreground w-28 flex-shrink-0">{row.label}</span>
+                          <span className="text-xs text-muted-foreground w-28 shrink-0">{row.label}</span>
                           <div className="flex-1 h-1.5 bg-muted rounded-full overflow-hidden">
                             <div
                               className="h-full rounded-full bg-primary transition-all"
@@ -817,6 +842,65 @@ export default function StockDetailPage() {
                 </div>
               </div>
 
+              {/* AI Forecast */}
+              <div className="groww-card p-4 space-y-3">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-bold text-foreground">AI 7-Day Forecast</p>
+                    <p className="text-[11px] text-muted-foreground">Short-term signal and price path</p>
+                  </div>
+                  <Button size="sm" onClick={handleForecast} disabled={forecastLoading} className="h-8">
+                    {forecastLoading ? "Generating..." : "Generate"}
+                  </Button>
+                </div>
+
+                {!forecastData && (
+                  <div className="rounded-lg border border-border bg-muted/30 p-3 text-xs text-muted-foreground">
+                    Generate a forecast to see the AI signal, confidence, and the next 7-day path.
+                  </div>
+                )}
+
+                {forecastData && (
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between gap-2">
+                      <span
+                        className={cn(
+                          "text-xs font-semibold px-2.5 py-1 rounded-full",
+                          forecastData.signal === "BULLISH"
+                            ? "bg-bull-muted text-bull"
+                            : forecastData.signal === "BEARISH"
+                              ? "bg-bear-muted text-bear"
+                              : "bg-muted text-muted-foreground"
+                        )}
+                      >
+                        {forecastData.signal}
+                      </span>
+                      <span className="text-xs text-muted-foreground">
+                        Confidence: <span className="font-semibold text-foreground">{Math.round(forecastData.confidence * 100)}%</span>
+                      </span>
+                    </div>
+
+                    <p className="text-xs text-muted-foreground leading-relaxed">
+                      {forecastData.summary}
+                    </p>
+
+                    <div className="space-y-2">
+                      {forecastData.forecast.map((item) => (
+                        <div key={item.date} className="flex items-center justify-between text-xs">
+                          <span className="text-muted-foreground">{formatDate(item.date, "short")}</span>
+                          <div className="flex items-center gap-2">
+                            <span className="font-semibold num text-foreground">{formatCurrency(item.predictedPrice)}</span>
+                            <span className={cn("text-[11px] font-semibold", item.delta >= 0 ? "text-bull" : "text-bear")}>
+                              {item.delta >= 0 ? "+" : ""}{formatPercent(item.deltaPercent)}
+                            </span>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+
               {/* About Company */}
               <div className="groww-card p-4">
                 <p className="text-base font-bold text-foreground mb-3">About {stock.symbol}</p>
@@ -848,7 +932,7 @@ export default function StockDetailPage() {
                         className="flex items-center gap-4 p-3 rounded-xl hover:bg-muted/50 cursor-pointer transition-colors"
                         onClick={() => router.push(`/explore/${s.symbol}`)}
                       >
-                        <div className="w-9 h-9 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
+                        <div className="w-9 h-9 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
                           <span className="text-xs font-black text-primary">{s.symbol.slice(0, 2)}</span>
                         </div>
                         <p className="text-sm font-bold text-muted-foreground">{s.symbol}</p>

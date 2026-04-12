@@ -1,3 +1,4 @@
+"use client";
 import { useEffect } from "react";
 import { Navbar } from "./navbar";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -26,42 +27,41 @@ export function AppShell({ children }: AppShellProps) {
 
   return (
     <TooltipProvider delay={300}>
-      <div className="h-screen w-full bg-background flex flex-col overflow-hidden">
+      <div className="min-h-screen w-full bg-background flex flex-col">
         {/* Fixed top navbar */}
-        <div className="shrink-0 z-50">
-          <Navbar />
-        </div>
+        <Navbar />
+
+        {/* Spacer to push content below the fixed navbar */}
+        {/* Mobile: h-14 (top bar only), Desktop: h-14 + h-11 (top bar + tab nav) = h-[6.25rem] */}
+        <div className="h-14 md:h-[6.25rem] shrink-0" />
 
         {/* Page content */}
-        <main className="flex-1 w-full flex overflow-hidden relative z-0">
-          <motion.div layout className="flex-1 min-w-0 overflow-y-auto">
-            <div
-              className={cn(
-                "animate-fade-in-up min-h-full transition-[padding] duration-300",
-                isOpen ? "px-0" : "px-12 lg:px-13"
-              )}
-            >
-              {children}
-            </div>
-          </motion.div>
-
-          <AnimatePresence>
-            {isOpen && (
-              <motion.div
-                layout
-                initial={{ opacity: 0, x: 300, width: 0 }}
-                animate={{ opacity: 1, x: 0, width: 400 }}
-                exit={{ opacity: 0, x: 300, width: 0 }}
-                transition={{ duration: 0.35, ease: "easeInOut" }}
-                className="shrink-0 border-l border-border bg-card h-full z-40 overflow-hidden"
-              >
-                <div className="w-[400px] h-full flex flex-col p-4 shadow-[-4px_0_24px_rgba(0,0,0,0.02)]">
-                  <Chatbot />
-                </div>
-              </motion.div>
+        <main className="flex-1 w-full relative z-0">
+          <div
+            className={cn(
+              "animate-fade-in-up min-h-full transition-[padding] duration-300 pb-16 md:pb-0",
+              isOpen ? "px-3 sm:px-4 lg:px-6 lg:pr-[416px]" : "px-3 sm:px-4 lg:px-8"
             )}
-          </AnimatePresence>
+          >
+            {children}
+          </div>
         </main>
+
+        {/* Fixed chatbot panel — starts below the fixed navbar */}
+        {/* Mobile: top-[calc(3.5rem+1px)] (57px), Desktop: top-[calc(6.25rem+1px)] (101px) */}
+        <AnimatePresence>
+          {isOpen && (
+            <motion.div
+              initial={{ x: "100%" }}
+              animate={{ x: 0 }}
+              exit={{ x: "100%" }}
+              transition={{ duration: 0.3, ease: [0.32, 0.72, 0, 1] }}
+              className="fixed top-[calc(3.5rem+1px)] md:top-[calc(6.25rem+1px)] right-0 bottom-0 w-full sm:w-[420px] z-40 border-l border-border bg-card overflow-hidden shadow-[-8px_0_32px_rgba(0,0,0,0.08)]"
+            >
+              <Chatbot />
+            </motion.div>
+          )}
+        </AnimatePresence>
       </div>
       <AuthModal />
     </TooltipProvider>

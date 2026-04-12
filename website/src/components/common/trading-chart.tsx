@@ -342,16 +342,16 @@ export function TradingChart({
           style={{ left: popover.x, top: popover.y }}
         >
           {/* ── Header ── */}
-          <div className="flex items-center gap-2 px-4 py-2.5 bg-gradient-to-r from-primary/10 to-primary/5 border-b border-border/60">
+          <div className="flex items-center gap-2 px-4 py-2.5 bg-linear-to-r from-primary/10 to-primary/5 border-b border-border/60">
             <div className="flex items-center gap-1.5 flex-1 min-w-0">
-              <Sparkles className="w-3.5 h-3.5 text-primary flex-shrink-0" />
+              <Sparkles className="w-3.5 h-3.5 text-primary shrink-0" />
               {popover.result ? (
                 <span className="flex items-center gap-1.5 text-xs font-semibold min-w-0 flex-wrap">
                   <span className="text-primary font-mono">{symbol}</span>
                   <span className="text-muted-foreground font-normal">
                     {popover.result.date}
                   </span>
-                  <MovementIcon className={`w-3 h-3 ${movementColor} flex-shrink-0`} />
+                  <MovementIcon className={`w-3 h-3 ${movementColor} shrink-0`} />
                   <span className={`${movementColor} font-mono`}>
                     {pct > 0 ? "+" : ""}
                     {pct.toFixed(2)}%
@@ -368,7 +368,7 @@ export function TradingChart({
             </div>
             <button
               onClick={() => setPopover((p) => ({ ...p, visible: false }))}
-              className="ml-1 flex-shrink-0 text-muted-foreground hover:text-foreground transition-colors rounded-md p-0.5 hover:bg-muted"
+              className="ml-1 shrink-0 text-muted-foreground hover:text-foreground transition-colors rounded-md p-0.5 hover:bg-muted"
               aria-label="Close analysis"
             >
               <X className="w-3.5 h-3.5" />
@@ -463,7 +463,7 @@ export function TradingChart({
                 <div className="space-y-1.5">
                   {bulletLines.map((line, i) => (
                     <div key={i} className="flex gap-2 text-[11px] leading-snug">
-                      <span className="text-primary mt-0.5 flex-shrink-0">
+                      <span className="text-primary mt-0.5 shrink-0">
                         {line.startsWith("•") || line.startsWith("-") ? "" : "•"}
                       </span>
                       <span className="text-foreground/90">{line.replace(/^[•\-]\s*/, "")}</span>

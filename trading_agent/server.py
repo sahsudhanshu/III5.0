@@ -295,7 +295,7 @@ async def analyze_point_endpoint(request: dict):
             date_compact = clicked_actual_date
 
         # ── 4. Real news via Tavily (3 targeted queries in parallel) ─────────
-        from .config import get_settings
+        from trading_agent.config import get_settings
         settings = get_settings()
 
         # One day before → one day after to widen net
@@ -410,23 +410,24 @@ WHY {company_name} ({symbol}) moved the way it did on **{clicked_actual_date}**.
 Write EXACTLY 4 bullet points explaining what ACTUALLY caused this price movement.
 
 RULES (violations mean failure):
+✅ Each bullet MUST be a single line — no multi-sentence explanations, no follow-up sentences.
+✅ Max ~20 words per bullet. Be punchy and specific.
 ✅ Every bullet must reference a real, specific, named event — not a vague description.
-   Examples of GOOD bullets:
-   - "📉 JNJ dropped 1.8% after the Trump administration announced new drug pricing executive orders on April 9, reducing expected pharma revenues."
-   - "🏛️ The broader market fell sharply on April 9 due to escalating US-China tariff fears after the White House confirmed 104% tariffs on Chinese goods."
-   - "💊 JNJ's Stelara biosimilar competition increased after FDA approved Amgen's version in Q1 2026, pressuring the immunology segment."
-✅ If movement was small/flat, explain what forces balanced each other out (e.g., stable dividend appeal vs. uncertainty about upcoming trial results).
-✅ Use the news articles above as primary source. If they don't contain enough detail, use your own training knowledge of what happened on/around {date_human}.
-✅ Mention impact magnitude where known (% drop, dollar amount, analyst price target, etc.)
+   Examples of GOOD (single-line) bullets:
+   - "📉 JNJ fell 1.8% after White House announced new drug pricing executive orders cutting pharma revenues."
+   - "🏛️ S&P 500 dropped on 104% US-China tariff confirmation, dragging broad market lower."
+   - "💊 FDA approved Amgen's Stelara biosimilar in Q1 2026, pressuring JNJ's immunology segment."
+✅ If movement was small/flat, explain competing forces in one line each.
+✅ Use the news articles above as primary source; fall back to training knowledge if needed.
 ✅ Start each bullet with a fitting emoji (📉 📈 🏛️ 💊 ⚖️ 💰 🌍 📊 🔬 📢 ⚡ 🛡️)
 
 ❌ DO NOT write:
+   - Multi-sentence bullets or explanatory follow-ups after a bullet
    - "Key level held as support" or "resistance at $X"
    - "Uptrend intact" or "downtrend confirmed"
    - "MA5 above MA20" as a standalone reason
    - "Volume confirmation" without a specific catalyst
    - Generic platitudes that would apply to ANY stock on ANY day
-   - Bullet points that repeat the date ({clicked_actual_date}) in every line — state it once if needed
 
 Focus on: earnings, macro events, sector news, analyst actions, regulatory decisions, geopolitical events, product announcements, executive changes, lawsuits, index events — anything REAL."""
 
@@ -438,7 +439,7 @@ Focus on: earnings, macro events, sector news, analyst actions, regulatory decis
             api_key=settings.nvidia_api_key,
             base_url=settings.nvidia_base_url,
             temperature=0.2,
-            max_tokens=700,
+            max_tokens=350,
         )
 
         response = await llm.ainvoke([

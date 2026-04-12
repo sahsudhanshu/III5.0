@@ -1,9 +1,10 @@
 "use client";
+import Image from "next/image";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useState, Suspense } from "react";
 import { signIn } from "next-auth/react";
-import { Eye, EyeOff, Activity } from "lucide-react";
+import { Eye, EyeOff } from "lucide-react";
 import { toast } from "sonner";
 import { motion } from "framer-motion";
 
@@ -56,7 +57,7 @@ function LoginContent() {
       <div className="absolute top-[30%] right-[20%] w-[35%] h-[35%] rounded-full bg-emerald-500/10 blur-[100px] mix-blend-screen pointer-events-none" />
 
       {/* Grid overlay for texture */}
-      <div className="absolute inset-0 bg-[linear-gradient(rgba(255,255,255,0.02)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.02)_1px,transparent_1px)] bg-[size:4rem_4rem] [mask-image:radial-gradient(ellipse_60%_60%_at_50%_50%,#000_20%,transparent_100%)] pointer-events-none" />
+      <div className="absolute inset-0 bg-[linear-gradient(rgba(255,255,255,0.02)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.02)_1px,transparent_1px)] bg-size-[4rem_4rem] mask-[radial-gradient(ellipse_60%_60%_at_50%_50%,#000_20%,transparent_100%)] pointer-events-none" />
 
       <motion.div 
         initial={{ opacity: 0, scale: 0.95, y: 15 }}
@@ -65,16 +66,20 @@ function LoginContent() {
         className="relative z-10 w-full max-w-md p-8 sm:p-10 md:mx-0 mx-4"
       >
         {/* Glassmorphism Container */}
-        <div className="absolute inset-0 rounded-[2rem] backdrop-blur-2xl bg-white/[0.015] border border-white/[0.05] shadow-[0_0_80px_rgba(0,0,0,0.8)] -z-10" />
+        <div className="absolute inset-0 rounded-4xl backdrop-blur-2xl bg-white/1.5 border border-white/5 shadow-[0_0_80px_rgba(0,0,0,0.8)] -z-10" />
 
         {/* Brand */}
         <div className="flex flex-col items-center mb-10">
-          <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-primary via-primary to-blue-500 flex items-center justify-center shadow-[0_0_40px_rgba(0,208,156,0.4)] mb-6 relative group cursor-pointer">
-            <Activity className="w-8 h-8 text-white group-hover:scale-110 transition-transform duration-300" />
-            <div className="absolute inset-0 rounded-2xl border border-white/20" />
-          </div>
+          <Image
+            src="/logo.png"
+            alt="TradeIQ Logo"
+            width={64}
+            height={64}
+            className="object-contain mb-6"
+            priority
+          />
           <h1 className="text-3xl font-black text-white tracking-tight mb-2">
-            Trade<span className="text-primary">IQ</span>
+            TradeIQ
           </h1>
           <p className="text-white/50 text-sm font-medium tracking-wide">Enter the analytics terminal</p>
         </div>
@@ -122,7 +127,7 @@ function LoginContent() {
             disabled={isLoading}
             className="w-full h-12 mt-2 bg-primary hover:bg-primary/90 text-primary-foreground font-bold rounded-xl flex items-center justify-center gap-2 transition-all shadow-[0_0_20px_rgba(0,208,156,0.2)] hover:shadow-[0_0_30px_rgba(0,208,156,0.4)] disabled:opacity-70 disabled:hover:shadow-[0_0_20px_rgba(0,208,156,0.2)] relative overflow-hidden group"
           >
-            <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent -translate-x-[150%] skew-x-[-20deg] group-hover:animate-[shimmer_1.5s_infinite] pointer-events-none" />
+            <div className="absolute inset-0 bg-linear-to-r from-transparent via-white/20 to-transparent -translate-x-[150%] skew-x-[-20deg] group-hover:animate-[shimmer_1.5s_infinite] pointer-events-none" />
             
             {isLoading
               ? <><div className="w-4 h-4 border-2 border-primary-foreground/30 border-t-primary-foreground rounded-full animate-spin" /> Authenticating…</>
@@ -143,7 +148,7 @@ function LoginContent() {
         <button
           type="button"
           onClick={handleGoogleLogin}
-          className="w-full h-12 bg-white/[0.03] border border-white/10 text-white font-semibold rounded-xl flex items-center justify-center gap-3 hover:bg-white/[0.08] hover:border-white/20 transition-all group"
+          className="w-full h-12 bg-white/3 border border-white/10 text-white font-semibold rounded-xl flex items-center justify-center gap-3 hover:bg-white/8 hover:border-white/20 transition-all group"
         >
           <div className="bg-white p-1 rounded-full group-hover:scale-110 transition-transform">
             <svg viewBox="0 0 24 24" className="w-4 h-4">

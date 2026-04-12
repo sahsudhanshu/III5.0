@@ -3,6 +3,7 @@
 import { useEffect, useState, useCallback, useMemo } from "react";
 import { usePortfolioStore } from "@/store/portfolio-store";
 import { useMarketStore } from "@/store/market-store";
+import { useDataStore } from "@/store/data-store";
 import { useRequireAuth } from "@/hooks/use-require-auth";
 import { formatCurrency, formatPercent, cn } from "@/lib/utils";
 import { useRouter } from "next/navigation";
@@ -109,6 +110,7 @@ export default function PortfolioPage() {
   const [fundsModal, setFundsModal] = useState<"DEPOSIT" | "WITHDRAW" | null>(null);
   const [fundsLoading, setFundsLoading] = useState(false);
   const { isAuthenticated, requireAuth } = useRequireAuth();
+  const { stocks, fetchStockProfile } = useDataStore();
 
   useEffect(() => {
     if (isAuthenticated) {
@@ -117,14 +119,41 @@ export default function PortfolioPage() {
     }
   }, [fetchPortfolio, fetchAiInsight, isAuthenticated]);
 
+  const holdings = portfolio?.holdings ?? [];
+
+  // Fetch true prices via data store 
+  useEffect(() => {
+    let mounted = true;
+    async function loadPrices() {
+      const symbols = holdings.map((h) => h.symbol);
+      for (const sym of symbols) {
+        if (!mounted) return;
+        await fetchStockProfile(sym);
+        await new Promise(r => setTimeout(r, 100)); // safety sleep
+      }
+    }
+    if (holdings.length) {
+      loadPrices();
+    }
+    return () => { mounted = false; };
+  }, [holdings, fetchStockProfile]);
+
   // Enrich holdings with live Finnhub prices whenever prices tick
   const priceMap = useCallback(() => {
     const map: Record<string, number> = {};
+    
+    // Base static prices
+    Object.entries(stocks).forEach(([sym, data]) => {
+      map[sym] = data.price;
+    });
+
+    // Overwrite with live ticks
     Object.entries(prices).forEach(([sym, data]) => {
       map[sym] = data.price;
     });
+    
     return map;
-  }, [prices]);
+  }, [prices, stocks]);
 
   useEffect(() => {
     if (portfolio?.holdings?.length) {
@@ -225,7 +254,7 @@ export default function PortfolioPage() {
 
   if (!isAuthenticated) {
     return (
-      <div className="p-6 max-w-screen-xl mx-auto flex flex-col items-center justify-center min-h-[60vh] text-center">
+      <div className="px-3 sm:px-4 lg:px-6 py-6 max-w-7xl mx-auto flex flex-col items-center justify-center min-h-[60vh] text-center">
         <div className="w-20 h-20 bg-muted rounded-full flex items-center justify-center mb-6">
           <Wallet className="w-10 h-10 text-muted-foreground/50" />
         </div>
@@ -245,7 +274,7 @@ export default function PortfolioPage() {
 
   if (loading && !portfolio) {
     return (
-      <div className="p-6 space-y-4 animate-pulse max-w-[1700px] mx-auto">
+      <div className="px-3 sm:px-4 lg:px-6 py-4 sm:py-6 space-y-4 animate-pulse max-w-[1700px] mx-auto">
         <div className="h-8 w-40 bg-muted rounded" />
         <div className="grid grid-cols-4 gap-4">
           {[...Array(4)].map((_, i) => <div key={i} className="h-24 bg-muted rounded-xl" />)}
@@ -256,7 +285,7 @@ export default function PortfolioPage() {
   }
 
   return (
-    <div className="p-6 space-y-6 max-w-[1700px] mx-auto">
+    <div className="px-3 sm:px-4 lg:px-6 py-4 sm:py-6 space-y-6 max-w-[1700px] mx-auto">
       {fundsModal && (
         <FundsModal
           type={fundsModal}

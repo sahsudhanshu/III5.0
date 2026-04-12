@@ -3,7 +3,7 @@ import { auth } from "@/auth";
 import connectDB from "@/lib/mongoose";
 import { getOrCreatePortfolio } from "@/lib/portfolio";
 
-const MAIN_TICKERS = ["AAPL", "MSFT", "GOOGL", "AMZN", "TSLA", "META", "NVDA", "BRK-B", "V", "WMT"] as const;
+const MAIN_TICKERS = ["AAPL", "MSFT", "GOOGL", "AMZN", "TSLA", "META", "NVDA", "WMT"] as const;
 
 // Approximate real market prices (used when the live RL engine is offline)
 const MOCK_PRICES: Record<string, number> = {

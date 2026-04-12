@@ -2,7 +2,7 @@
 import { create } from "zustand";
 import type { Stock, NewsArticle, CandlestickDataPoint } from "@/types";
 import { toast } from "sonner";
-import { generateCandlestickData, MOCK_NEWS } from "@/lib/mock-data";
+import { generateCandlestickData } from "@/lib/mock-data";
 
 // Number of daily bars to pre-populate when using mock data
 const MOCK_CANDLE_DAYS = 252;
@@ -10,7 +10,7 @@ const MOCK_CANDLE_DAYS = 252;
 // Predefined set of top stocks so our dashboard doesn't have an empty screen
 // We will lazy load their actual data from Finnhub to preserve API rate limits.
 export const INITIAL_UNIVERSE = [
-  "AAPL", "MSFT", "NVDA", "TSLA", "AMZN", "META", "GOOGL", "JPM", "WMT", "JNJ"
+  "AAPL", "MSFT", "GOOGL", "AMZN", "TSLA", "META", "NVDA", "WMT"
 ];
 
 // ── Rate-limit retry constants ───────────────────────────────────────────────
@@ -65,23 +65,7 @@ async function fetchFinnhub<T>(endpoint: string): Promise<T> {
 /** Sleep helper */
 const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
 
-function getFallbackSymbolNews(symbol: string): NewsArticle[] {
-  const sym = symbol.toUpperCase();
-  const now = Date.now();
 
-  const symbolMatched = MOCK_NEWS.filter((n) =>
-    (n.relatedSymbols || []).some((s) => s.toUpperCase() === sym)
-  );
-
-  const source = symbolMatched.length > 0 ? symbolMatched : MOCK_NEWS;
-
-  return source.slice(0, 10).map((n, idx) => ({
-    ...n,
-    id: `${n.id}_fallback_${sym}_${idx}`,
-    publishedAt: n.publishedAt || new Date(now - idx * 3600000).toISOString(),
-    feedType: "fallback",
-  }));
-}
 
 export const useDataStore = create<DataState>((set, get) => ({
   stocks: {},
@@ -97,61 +81,107 @@ export const useDataStore = create<DataState>((set, get) => ({
 
     set((state) => ({ isFetching: { ...state.isFetching, [`profile_${symbol}`]: true } }));
 
-    try {
-      const [profileData, quoteData, metricData] = await Promise.all([
-        fetchFinnhub<any>(`/stock/profile2?symbol=${symbol}`),
-        fetchFinnhub<any>(`/quote?symbol=${symbol}`),
-        fetchFinnhub<any>(`/stock/metric?symbol=${symbol}&metric=all`),
-      ]);
+    for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+      if (globalRateLimitedUntil && Date.now() < globalRateLimitedUntil) {
+        const waitMs = globalRateLimitedUntil - Date.now();
+        const secsLeft = Math.ceil(waitMs / 1000);
+        console.info(`[Profile] Rate-limited. Retry ${attempt + 1}/${MAX_RETRIES + 1} in ${secsLeft}s for ${symbol}`);
+        
+        // Use the existing UI countdown state if you want it visible system-wide
+        set({ candleRetryCountdown: secsLeft });
+        startCountdown(globalRateLimitedUntil, (s) =>
+          set({ candleRetryCountdown: s === 0 ? null : s })
+        );
 
-      if (!profileData || Object.keys(profileData).length === 0) {
-        console.warn(`No profile data for ${symbol}`);
-        set((state) => ({ isFetching: { ...state.isFetching, [`profile_${symbol}`]: false } }));
-        return null;
+        toast.info(`⏳ Waiting ${secsLeft}s for Finnhub rate limit to refresh...`, {
+          id: "profile-rate-limit",
+          duration: waitMs + 2000,
+        });
+
+        await sleep(waitMs + 500);
+        globalRateLimitedUntil = null;
+        set({ candleRetryCountdown: null });
       }
 
-      const m = metricData?.metric || {};
+      try {
+        const [profileData, quoteData, metricData] = await Promise.all([
+          fetchFinnhub<any>(`/stock/profile2?symbol=${symbol}`),
+          fetchFinnhub<any>(`/quote?symbol=${symbol}`),
+          fetchFinnhub<any>(`/stock/metric?symbol=${symbol}&metric=all`),
+        ]);
 
-      const newStock: Stock = {
-        symbol: profileData.ticker || symbol,
-        name: profileData.name || symbol,
-        exchange: profileData.exchange?.includes("NASDAQ")
-          ? "NASDAQ"
-          : profileData.exchange?.includes("NEW YORK")
-            ? "NYSE"
-            : "CRYPTO",
-        sector: profileData.finnhubIndustry || "Other",
-        price: quoteData.c || 0,
-        change: quoteData.d || 0,
-        changePercent: quoteData.dp || 0,
-        volume: 0,
-        marketCap: profileData.marketCapitalization
-          ? profileData.marketCapitalization * 1_000_000
-          : 0,
-        high52w: m["52WeekHigh"] || 0,
-        low52w: m["52WeekLow"] || 0,
-        dayHigh: quoteData.h || 0,
-        dayLow: quoteData.l || 0,
-        open: quoteData.o || 0,
-        previousClose: quoteData.pc || 0,
-        pe: m.peExclExtraTTM || m.peBasicExclExtraTTM || 0,
-        pb: m.pbAnnual || 0,
-        eps: m.epsExclExtraItemsTTM || 0,
-        dividendYield: m.dividendYieldIndicatedAnnual || 0,
-        beta: m.beta || 1,
-      };
+        if (!profileData || Object.keys(profileData).length === 0) {
+          console.warn(`No profile data for ${symbol}`);
+          if (attempt === MAX_RETRIES) {
+             set((state) => ({ isFetching: { ...state.isFetching, [`profile_${symbol}`]: false } }));
+             return null;
+          }
+          continue;
+        }
 
-      set((state) => ({
-        stocks: { ...state.stocks, [symbol]: newStock },
-        isFetching: { ...state.isFetching, [`profile_${symbol}`]: false },
-      }));
+        const m = metricData?.metric || {};
 
-      return newStock;
-    } catch (error) {
-      console.error("Failed to fetch stock profile:", error);
-      set((state) => ({ isFetching: { ...state.isFetching, [`profile_${symbol}`]: false } }));
-      return null;
+        const newStock: Stock = {
+          symbol: profileData.ticker || symbol,
+          name: profileData.name || symbol,
+          exchange: profileData.exchange?.includes("NASDAQ")
+            ? "NASDAQ"
+            : profileData.exchange?.includes("NEW YORK")
+              ? "NYSE"
+              : "CRYPTO",
+          sector: profileData.finnhubIndustry || "Other",
+          price: quoteData.c || 0,
+          change: quoteData.d || 0,
+          changePercent: quoteData.dp || 0,
+          volume: 0,
+          marketCap: profileData.marketCapitalization
+            ? profileData.marketCapitalization * 1_000_000
+            : 0,
+          high52w: m["52WeekHigh"] || 0,
+          low52w: m["52WeekLow"] || 0,
+          dayHigh: quoteData.h || 0,
+          dayLow: quoteData.l || 0,
+          open: quoteData.o || 0,
+          previousClose: quoteData.pc || 0,
+          pe: m.peExclExtraTTM || m.peBasicExclExtraTTM || 0,
+          pb: m.pbAnnual || 0,
+          eps: m.epsExclExtraItemsTTM || 0,
+          dividendYield: m.dividendYieldIndicatedAnnual || 0,
+          beta: m.beta || 1,
+        };
+
+        set((state) => ({
+          stocks: { ...state.stocks, [symbol]: newStock },
+          isFetching: { ...state.isFetching, [`profile_${symbol}`]: false },
+        }));
+
+        if (attempt > 0) {
+          toast.success(`✅ Loaded profile for ${symbol}!`, { id: "profile-rate-limit" });
+        }
+        return newStock;
+
+      } catch (error: any) {
+        const status = parseInt(error?.message?.match(/\d{3}/)?.[0] ?? "0", 10);
+        const isRateLimited = status === 429;
+
+        if (isRateLimited && attempt < MAX_RETRIES) {
+          globalRateLimitedUntil = Date.now() + RATE_LIMIT_RETRY_DELAY_MS;
+          console.warn(`[Profile] 429 rate limit hit for ${symbol}. Will retry in 61s.`);
+          continue; // Wait at loop top
+        }
+
+        console.error(`Failed to fetch stock profile for ${symbol}:`, error);
+        
+        if (attempt === MAX_RETRIES) {
+           toast.error(`Finnhub error for ${symbol}: ${error.message}`);
+           set((state) => ({ isFetching: { ...state.isFetching, [`profile_${symbol}`]: false } }));
+           return null;
+        }
+      }
     }
+
+    set((state) => ({ isFetching: { ...state.isFetching, [`profile_${symbol}`]: false } }));
+    return null;
   },
 
   fetchNews: async (symbol: string) => {
@@ -182,7 +212,7 @@ export const useDataStore = create<DataState>((set, get) => ({
         imageUrl: n.image || undefined,
       }));
 
-      const finalNews = parsedNews.length > 0 ? parsedNews : getFallbackSymbolNews(symbol);
+      const finalNews = parsedNews;
 
       set((state) => ({
         news: { ...state.news, [symbol]: finalNews },
@@ -192,12 +222,11 @@ export const useDataStore = create<DataState>((set, get) => ({
       return finalNews;
     } catch (error) {
       console.error("Failed to fetch news:", error);
-      const fallbackNews = getFallbackSymbolNews(symbol);
       set((state) => ({
-        news: { ...state.news, [symbol]: fallbackNews },
+        news: { ...state.news, [symbol]: [] },
         isFetching: { ...state.isFetching, [`news_${symbol}`]: false },
       }));
-      return fallbackNews;
+      return [];
     }
   },
 

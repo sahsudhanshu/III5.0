@@ -440,8 +440,8 @@ export default function SmartGraph() {
   if (loading) {
     return (
       <div className="flex flex-col justify-center items-center h-[600px] gap-3">
-        <div className="w-10 h-10 border-4 border-blue-500 border-t-transparent rounded-full animate-spin" />
-        <p className="text-slate-500 text-sm">Loading Knowledge Graph…</p>
+        <div className="w-10 h-10 border-4 border-primary border-t-transparent rounded-full animate-spin" />
+        <p className="text-muted-foreground text-sm">Loading Knowledge Graph...</p>
       </div>
     );
   }
@@ -464,40 +464,40 @@ export default function SmartGraph() {
 
   // ── Render ────────────────────────────────────────────────────────────────
   return (
-    <div className="relative w-full h-[800px] bg-slate-50 dark:bg-slate-900 border rounded-xl overflow-hidden shadow-lg">
+    <div className="relative w-full h-[800px] bg-card/70 border border-border rounded-2xl overflow-hidden shadow-sm">
       {/* ── Controls (top-left) ──────────────────────────────────────────── */}
       <div className="absolute top-4 left-4 z-10 flex flex-col gap-2 w-80">
         {/* Error Banner */}
         {error && (
-          <div className="bg-red-50 dark:bg-red-950/50 border border-red-200 dark:border-red-900 text-red-600 dark:text-red-400 px-3 py-2 rounded-lg text-sm flex items-start gap-2 shadow-sm animate-in fade-in">
+          <div className="bg-destructive/10 border border-destructive/30 text-destructive px-3 py-2 rounded-lg text-sm flex items-start gap-2 shadow-sm animate-in fade-in">
             <AlertCircle className="w-4 h-4 mt-0.5 shrink-0" />
             <p className="flex-1">{error}</p>
           </div>
         )}
 
         {/* Add tickers */}
-        <div className="flex gap-2 bg-white/80 dark:bg-black/80 p-3 rounded-lg backdrop-blur-sm shadow border">
+        <div className="flex gap-2 bg-card/80 p-3 rounded-lg backdrop-blur-sm shadow-sm border border-border">
           <input
             type="text"
             placeholder="Tickers e.g. AAPL, MSFT"
             value={inputTickers}
             onChange={e => setInputTickers(e.target.value)}
-            className="flex-1 px-3 py-1 text-sm border rounded hover:border-blue-500 focus:outline-none dark:bg-transparent"
+            className="flex-1 px-3 py-1 text-sm border border-border rounded bg-transparent hover:border-primary/60 focus:outline-none focus:ring-2 focus:ring-primary/20"
             onKeyDown={e => { if (e.key === 'Enter') handleBuildGraph(); }}
           />
           <button
             onClick={handleBuildGraph}
             disabled={isBuilding}
-            className="px-3 py-1 text-sm bg-blue-600 text-white rounded font-medium hover:bg-blue-700 disabled:opacity-50 transition-colors"
+            className="px-3 py-1 text-sm bg-primary text-primary-foreground rounded font-medium hover:bg-primary/90 disabled:opacity-50 transition-colors"
           >
-            {isBuilding ? 'Building…' : 'Add'}
+            {isBuilding ? 'Building...' : 'Add'}
           </button>
         </div>
 
         {/* Filter */}
-        <div className="flex bg-white/80 dark:bg-black/80 p-2 rounded-lg backdrop-blur-sm shadow border">
+        <div className="flex bg-card/80 p-2 rounded-lg backdrop-blur-sm shadow-sm border border-border">
           <select
-            className="w-full p-1 text-sm border rounded bg-transparent focus:outline-none"
+            className="w-full p-1 text-sm border border-border rounded bg-transparent focus:outline-none focus:ring-2 focus:ring-primary/20"
             value={filter}
             onChange={e => {
               setFilter(e.target.value);
@@ -527,46 +527,46 @@ export default function SmartGraph() {
       </div>
 
       {/* ── Legend (bottom-left) ─────────────────────────────────────────── */}
-      <div className="absolute bottom-4 left-4 z-10 bg-white/90 dark:bg-slate-950/90 backdrop-blur-sm rounded-lg p-3 shadow border text-[11px] space-y-1.5">
-        <p className="font-semibold text-xs mb-1.5 text-slate-700 dark:text-slate-300">Legend</p>
+      <div className="absolute bottom-4 left-4 z-10 bg-card/90 backdrop-blur-sm rounded-lg p-3 shadow-sm border border-border text-[11px] space-y-1.5">
+        <p className="font-semibold text-xs mb-1.5 text-foreground">Legend</p>
         <div className="flex items-center gap-2"><span className="w-3 h-3 rounded-full bg-blue-500 inline-block" /> Company</div>
         <div className="flex items-center gap-2"><span className="w-3 h-3 rotate-45 bg-emerald-500 inline-block" /> Industry / Product</div>
         <div className="flex items-center gap-2"><span className="w-3 h-3 bg-amber-500 inline-block" /> News Article</div>
-        <hr className="border-slate-200 dark:border-slate-700 my-1" />
+        <hr className="border-border my-1" />
         <div className="flex items-center gap-2"><span className="w-6 h-0.5 bg-green-600 inline-block rounded" /> Positive Correlation</div>
         <div className="flex items-center gap-2"><span className="w-6 h-0.5 bg-red-600 inline-block rounded" /> Negative Correlation</div>
         <div className="flex items-center gap-2"><span className="w-6 h-0.5 bg-violet-500 inline-block rounded" /> Same Sector / Trend</div>
-        <p className="text-slate-400 mt-1 italic">Edge thickness = correlation strength</p>
+        <p className="text-muted-foreground mt-1 italic">Edge thickness = correlation strength</p>
       </div>
 
       {/* ── Detail Panel (top-right) ─────────────────────────────────────── */}
       {activeData && (
-        <Card className="absolute top-4 right-4 z-10 w-80 p-4 bg-white/95 dark:bg-slate-950/95 backdrop-blur-md shadow-2xl border-blue-500/20 transition-all duration-300">
+        <Card className="absolute top-4 right-4 z-10 w-80 p-4 bg-card/95 backdrop-blur-md shadow-xl border border-border transition-all duration-300">
           {/* ── Edge detail (CORRELATED_WITH) ─── */}
           {activeData._type === 'edge' && (
             <div>
-              <h3 className="text-sm font-bold mb-3 text-slate-700 dark:text-slate-200">
+              <h3 className="text-sm font-bold mb-3 text-foreground">
                 Correlation Details
               </h3>
               <div className="grid grid-cols-2 gap-2 text-sm">
-                <div className="bg-slate-100 dark:bg-slate-800 p-2 rounded">
-                  <span className="text-slate-500 block text-xs">Pearson</span>
+                <div className="bg-muted/60 p-2 rounded">
+                  <span className="text-muted-foreground block text-xs">Pearson</span>
                   <span className={`font-bold ${(activeData.pearson ?? 0) >= 0 ? 'text-green-600' : 'text-red-600'}`}>
                     {activeData.pearson ?? 'N/A'}
                   </span>
                 </div>
-                <div className="bg-slate-100 dark:bg-slate-800 p-2 rounded">
-                  <span className="text-slate-500 block text-xs">Spearman</span>
+                <div className="bg-muted/60 p-2 rounded">
+                  <span className="text-muted-foreground block text-xs">Spearman</span>
                   <span className={`font-bold ${(activeData.spearman ?? 0) >= 0 ? 'text-green-600' : 'text-red-600'}`}>
                     {activeData.spearman ?? 'N/A'}
                   </span>
                 </div>
-                <div className="bg-slate-100 dark:bg-slate-800 p-2 rounded">
-                  <span className="text-slate-500 block text-xs">Strength</span>
+                <div className="bg-muted/60 p-2 rounded">
+                  <span className="text-muted-foreground block text-xs">Strength</span>
                   <span className="font-semibold">{activeData.strength ?? 'N/A'}</span>
                 </div>
-                <div className="bg-slate-100 dark:bg-slate-800 p-2 rounded">
-                  <span className="text-slate-500 block text-xs">Direction</span>
+                <div className="bg-muted/60 p-2 rounded">
+                  <span className="text-muted-foreground block text-xs">Direction</span>
                   <span className={`font-semibold capitalize ${(activeData.direction ?? '').toLowerCase() === 'positive' ? 'text-green-600' : 'text-red-600'}`}>
                     {activeData.direction ?? 'N/A'}
                   </span>
@@ -579,54 +579,54 @@ export default function SmartGraph() {
           {activeData._type === 'node' && activeData.label === 'Company' && (
             <div>
               <div className="flex justify-between items-start">
-                <h3 className="text-xl font-bold mb-1">{activeData.name} ({activeData.ticker})</h3>
+                <h3 className="text-xl font-bold mb-1 text-foreground">{activeData.name} ({activeData.ticker})</h3>
                 {selectedNodeData && (
-                  <span className="text-[10px] font-semibold bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full mt-1">Locked</span>
+                  <span className="text-[10px] font-semibold bg-primary/10 text-primary px-2 py-0.5 rounded-full mt-1">Locked</span>
                 )}
               </div>
               <div className="grid grid-cols-2 gap-2 text-sm mt-3">
-                <div className="bg-slate-100 dark:bg-slate-800 p-2 rounded transition-colors hover:bg-slate-200 dark:hover:bg-slate-700">
-                  <span className="text-slate-500 block text-xs">Price</span>
+                <div className="bg-muted/60 p-2 rounded transition-colors hover:bg-muted">
+                  <span className="text-muted-foreground block text-xs">Price</span>
                   <span className="font-semibold">${activeData.current_price?.toFixed(2) ?? '0.00'}</span>
                 </div>
-                <div className="bg-slate-100 dark:bg-slate-800 p-2 rounded transition-colors hover:bg-slate-200 dark:hover:bg-slate-700">
-                  <span className="text-slate-500 block text-xs">Momentum</span>
+                <div className="bg-muted/60 p-2 rounded transition-colors hover:bg-muted">
+                  <span className="text-muted-foreground block text-xs">Momentum</span>
                   <span className={`font-semibold ${(activeData.momentum ?? 0) > 0 ? 'text-green-500' : 'text-red-500'}`}>
                     {(activeData.momentum ?? 0) > 0 ? '+' : ''}{activeData.momentum ?? 0}%
                   </span>
                 </div>
-                <div className="bg-slate-100 dark:bg-slate-800 p-2 rounded transition-colors hover:bg-slate-200 dark:hover:bg-slate-700">
-                  <span className="text-slate-500 block text-xs">SMA 50 / 200</span>
+                <div className="bg-muted/60 p-2 rounded transition-colors hover:bg-muted">
+                  <span className="text-muted-foreground block text-xs">SMA 50 / 200</span>
                   <span className="font-semibold text-xs">{activeData.sma_50 ?? 0} / {activeData.sma_200 ?? 0}</span>
                 </div>
-                <div className="bg-slate-100 dark:bg-slate-800 p-2 rounded transition-colors hover:bg-slate-200 dark:hover:bg-slate-700">
-                  <span className="text-slate-500 block text-xs">MACD</span>
+                <div className="bg-muted/60 p-2 rounded transition-colors hover:bg-muted">
+                  <span className="text-muted-foreground block text-xs">MACD</span>
                   <span className="font-semibold text-xs">{activeData.macd ?? 0}</span>
                 </div>
-                <div className="bg-slate-100 dark:bg-slate-800 p-2 rounded transition-colors hover:bg-slate-200 dark:hover:bg-slate-700">
-                  <span className="text-slate-500 block text-xs">RSI</span>
+                <div className="bg-muted/60 p-2 rounded transition-colors hover:bg-muted">
+                  <span className="text-muted-foreground block text-xs">RSI</span>
                   <span className={`font-semibold text-xs ${(activeData.rsi ?? 50) > 70 ? 'text-red-500' : (activeData.rsi ?? 50) < 30 ? 'text-green-500' : ''}`}>
                     {activeData.rsi ?? 0}
                   </span>
                 </div>
-                <div className="bg-slate-100 dark:bg-slate-800 p-2 rounded transition-colors hover:bg-slate-200 dark:hover:bg-slate-700">
-                  <span className="text-slate-500 block text-xs">Volatility</span>
+                <div className="bg-muted/60 p-2 rounded transition-colors hover:bg-muted">
+                  <span className="text-muted-foreground block text-xs">Volatility</span>
                   <span className="font-semibold text-xs">{activeData.volatility ?? 0}</span>
                 </div>
               </div>
 
               {selectedNodeData && (
-                <div className="flex gap-2 mt-4 pt-4 border-t border-slate-100 dark:border-slate-800">
+                <div className="flex gap-2 mt-4 pt-4 border-t border-border">
                   <button
                     onClick={handleSimulate}
-                    className="flex-1 flex items-center justify-center gap-1.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-medium py-2 rounded transition-colors"
+                    className="flex-1 flex items-center justify-center gap-1.5 bg-primary hover:bg-primary/90 text-primary-foreground text-xs font-medium py-2 rounded transition-colors"
                   >
                     <LineChart className="w-3.5 h-3.5" />
                     Simulate
                   </button>
                   <button
                     onClick={handleInsights}
-                    className="flex-1 flex items-center justify-center gap-1.5 bg-purple-600 hover:bg-purple-700 text-white text-xs font-medium py-2 rounded transition-colors"
+                    className="flex-1 flex items-center justify-center gap-1.5 bg-muted hover:bg-muted/80 text-foreground text-xs font-medium py-2 rounded transition-colors"
                   >
                     <Bot className="w-3.5 h-3.5" />
                     AI Insights
@@ -640,21 +640,21 @@ export default function SmartGraph() {
           {activeData._type === 'node' && activeData.label === 'News' && (
             <div>
               <div className="flex justify-between items-start mb-2">
-                <h3 className="text-md font-bold">{activeData.source}</h3>
-                <span className={`text-xs px-2 py-1 rounded-full ${activeData.sentiment === 'Positive' ? 'bg-green-100 text-green-700' : activeData.sentiment === 'Negative' ? 'bg-red-100 text-red-700' : 'bg-slate-100 text-slate-700'}`}>
+                <h3 className="text-md font-bold text-foreground">{activeData.source}</h3>
+                <span className={`text-xs px-2 py-1 rounded-full ${activeData.sentiment === 'Positive' ? 'bg-green-100 text-green-700' : activeData.sentiment === 'Negative' ? 'bg-red-100 text-red-700' : 'bg-muted text-foreground'}`}>
                   {activeData.sentiment}
                 </span>
               </div>
-              <p className="text-sm font-medium mb-2">{activeData.title}</p>
-              <p className="text-xs text-slate-500 line-clamp-4">{activeData.snippet}</p>
+              <p className="text-sm font-medium mb-2 text-foreground">{activeData.title}</p>
+              <p className="text-xs text-muted-foreground line-clamp-4">{activeData.snippet}</p>
             </div>
           )}
 
           {/* ── Product detail ─── */}
           {activeData._type === 'node' && activeData.label === 'Product' && (
             <div>
-              <h3 className="text-lg font-bold">{activeData.name}</h3>
-              <p className="text-sm text-slate-500">{activeData.sector} • {activeData.industry}</p>
+              <h3 className="text-lg font-bold text-foreground">{activeData.name}</h3>
+              <p className="text-sm text-muted-foreground">{activeData.sector} • {activeData.industry}</p>
             </div>
           )}
         </Card>
@@ -741,7 +741,7 @@ export default function SmartGraph() {
       {!chatOpen && (
         <button
           onClick={() => setChatOpen(true)}
-          className="absolute bottom-4 right-4 z-20 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white p-3 rounded-full shadow-xl transition-all hover:scale-105"
+          className="absolute bottom-4 right-4 z-20 bg-primary hover:bg-primary/90 text-primary-foreground p-3 rounded-full shadow-lg transition-all hover:scale-105"
           title="Ask AI about the graph"
         >
           <MessageSquare className="w-5 h-5" />
@@ -750,26 +750,26 @@ export default function SmartGraph() {
 
       {/* ── Chat Panel (right side) ───────────────────────────────── */}
       {chatOpen && (
-        <div className="absolute top-0 right-0 z-30 h-full w-96 flex flex-col bg-white/98 dark:bg-slate-950/98 backdrop-blur-lg border-l border-slate-200 dark:border-slate-800 shadow-2xl">
+        <div className="absolute top-0 right-0 z-30 h-full w-96 flex flex-col bg-card/98 backdrop-blur-lg border-l border-border shadow-xl">
           {/* Header */}
-          <div className="bg-gradient-to-r from-indigo-600 to-purple-600 px-4 py-3 flex items-center justify-between shrink-0">
+          <div className="bg-primary px-4 py-3 flex items-center justify-between shrink-0">
             <div className="flex items-center gap-2">
-              <Sparkles className="w-4 h-4 text-white" />
-              <span className="text-white font-semibold text-sm">Graph AI Analyst</span>
+              <Sparkles className="w-4 h-4 text-primary-foreground" />
+              <span className="text-primary-foreground font-semibold text-sm">Graph AI Analyst</span>
             </div>
             <button
               onClick={() => setChatOpen(false)}
-              className="p-1 rounded-full hover:bg-white/20 transition-colors"
+              className="p-1 rounded-full hover:bg-primary/80 transition-colors"
             >
-              <X className="w-4 h-4 text-white/80" />
+              <X className="w-4 h-4 text-primary-foreground/80" />
             </button>
           </div>
 
           {/* Context indicator */}
           {selectedNodeData?.ticker && (
-            <div className="px-4 py-2 bg-indigo-50 dark:bg-indigo-950/30 border-b border-indigo-100 dark:border-indigo-900 shrink-0">
-              <p className="text-xs text-indigo-600 dark:text-indigo-400">
-                📌 Context: <span className="font-semibold">{selectedNodeData.name} ({selectedNodeData.ticker})</span>
+            <div className="px-4 py-2 bg-primary/10 border-b border-border shrink-0">
+              <p className="text-xs text-primary">
+                Context: <span className="font-semibold">{selectedNodeData.name} ({selectedNodeData.ticker})</span>
               </p>
             </div>
           )}
@@ -778,8 +778,8 @@ export default function SmartGraph() {
           <div className="flex-1 overflow-y-auto px-4 py-3 space-y-3">
             {chatMessages.length === 0 && (
               <div className="text-center py-10 space-y-3">
-                <Sparkles className="w-8 h-8 text-indigo-400 mx-auto" />
-                <p className="text-sm text-slate-500">Ask me anything about the graph</p>
+                <Sparkles className="w-8 h-8 text-primary/70 mx-auto" />
+                <p className="text-sm text-muted-foreground">Ask me anything about the graph</p>
                 <div className="space-y-1.5">
                   {[
                     'Tell me about Apple\'s correlations',
@@ -790,7 +790,7 @@ export default function SmartGraph() {
                     <button
                       key={i}
                       onClick={() => { setChatInput(q); }}
-                      className="block w-full text-left text-xs bg-slate-50 dark:bg-slate-800 hover:bg-indigo-50 dark:hover:bg-indigo-900/20 px-3 py-2 rounded-lg text-slate-600 dark:text-slate-400 transition-colors"
+                      className="block w-full text-left text-xs bg-muted/50 hover:bg-muted px-3 py-2 rounded-lg text-muted-foreground transition-colors"
                     >
                       “{q}”
                     </button>
@@ -804,8 +804,8 @@ export default function SmartGraph() {
                 <div
                   className={`max-w-[85%] px-3 py-2 rounded-xl text-sm leading-relaxed ${
                     msg.role === 'user'
-                      ? 'bg-indigo-600 text-white rounded-br-sm'
-                      : 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200 rounded-bl-sm'
+                      ? 'bg-primary text-primary-foreground rounded-br-sm'
+                      : 'bg-muted/70 text-foreground rounded-bl-sm'
                   }`}
                 >
                   {msg.role === 'assistant' ? (
@@ -819,11 +819,11 @@ export default function SmartGraph() {
 
             {chatLoading && (
               <div className="flex justify-start">
-                <div className="bg-slate-100 dark:bg-slate-800 px-4 py-3 rounded-xl rounded-bl-sm">
+                <div className="bg-muted/70 px-4 py-3 rounded-xl rounded-bl-sm">
                   <div className="flex gap-1.5">
-                    <div className="w-2 h-2 bg-indigo-400 rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
-                    <div className="w-2 h-2 bg-indigo-400 rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
-                    <div className="w-2 h-2 bg-indigo-400 rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
+                    <div className="w-2 h-2 bg-primary/70 rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
+                    <div className="w-2 h-2 bg-primary/70 rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
+                    <div className="w-2 h-2 bg-primary/70 rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
                   </div>
                 </div>
               </div>
@@ -833,7 +833,7 @@ export default function SmartGraph() {
           </div>
 
           {/* Input */}
-          <div className="px-3 py-3 border-t border-slate-200 dark:border-slate-800 shrink-0">
+          <div className="px-3 py-3 border-t border-border shrink-0">
             <div className="flex gap-2">
               <input
                 type="text"
@@ -842,12 +842,12 @@ export default function SmartGraph() {
                 onChange={e => setChatInput(e.target.value)}
                 onKeyDown={e => { if (e.key === 'Enter') handleChatSend(); }}
                 disabled={chatLoading}
-                className="flex-1 px-3 py-2 text-sm bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 disabled:opacity-50"
+                className="flex-1 px-3 py-2 text-sm bg-muted/60 border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20 disabled:opacity-50"
               />
               <button
                 onClick={handleChatSend}
                 disabled={chatLoading || !chatInput.trim()}
-                className="px-3 py-2 bg-indigo-600 hover:bg-indigo-700 disabled:bg-indigo-400 text-white rounded-lg transition-colors"
+                className="px-3 py-2 bg-primary hover:bg-primary/90 disabled:bg-primary/60 text-primary-foreground rounded-lg transition-colors"
               >
                 <Send className="w-4 h-4" />
               </button>

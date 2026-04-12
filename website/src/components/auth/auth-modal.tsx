@@ -71,7 +71,7 @@ export function AuthModal() {
     >
       <DialogContent className="max-w-[400px] p-0 border-none bg-transparent shadow-none [&>button]:hidden sm:rounded-3xl">
         <DialogTitle className="sr-only">Sign in to view</DialogTitle>
-        <div className="relative w-full p-8 sm:p-10 rounded-[2rem] overflow-hidden">
+        <div className="relative w-full p-8 sm:p-10 rounded-4xl overflow-hidden">
           
           <div className="absolute inset-0 bg-[#050914]/90 backdrop-blur-3xl border border-white/[0.08] shadow-[0_0_80px_rgba(0,0,0,0.8)] -z-10" />
 
@@ -143,7 +143,7 @@ export function AuthModal() {
               disabled={isLoading}
               className="w-full h-11 mt-4 bg-primary hover:bg-primary/90 text-primary-foreground font-bold text-sm rounded-xl flex items-center justify-center gap-2 transition-all shadow-[0_0_20px_rgba(0,208,156,0.2)] hover:shadow-[0_0_30px_rgba(0,208,156,0.4)] disabled:opacity-70 relative overflow-hidden group"
             >
-              <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent -translate-x-[150%] skew-x-[-20deg] group-hover:animate-[shimmer_1.5s_infinite] pointer-events-none" />
+              <div className="absolute inset-0 bg-linear-to-r from-transparent via-white/20 to-transparent -translate-x-[150%] skew-x-[-20deg] group-hover:animate-[shimmer_1.5s_infinite] pointer-events-none" />
               {isLoading
                 ? <><div className="w-4 h-4 border-2 border-primary-foreground/30 border-t-primary-foreground rounded-full animate-spin" /> Authenticating…</>
                 : "Authorize Access"
@@ -163,7 +163,7 @@ export function AuthModal() {
           <button
             type="button"
             onClick={handleGoogleLogin}
-            className="w-full h-11 bg-white/[0.03] border border-white/10 text-white text-xs font-semibold rounded-xl flex items-center justify-center gap-3 hover:bg-white/[0.08] hover:border-white/20 transition-all group"
+            className="w-full h-11 bg-white/3 border border-white/10 text-white text-xs font-semibold rounded-xl flex items-center justify-center gap-3 hover:bg-white/8 hover:border-white/20 transition-all group"
           >
             <div className="bg-white p-0.5 rounded-full group-hover:scale-110 transition-transform">
               <svg viewBox="0 0 24 24" className="w-[14px] h-[14px]">

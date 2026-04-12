@@ -104,10 +104,10 @@ function StockRow({ stock, rank }: { stock: Stock; rank?: number }) {
       onClick={() => router.push(`/explore/${stock.symbol}`)}
     >
       {rank && (
-        <span className="text-xs font-bold text-muted-foreground w-5 text-center flex-shrink-0">{rank}</span>
+        <span className="text-xs font-bold text-muted-foreground w-5 text-center shrink-0">{rank}</span>
       )}
       {/* Logo */}
-      <div className="w-9 h-9 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
+      <div className="w-9 h-9 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
         <span className="text-[11px] font-black text-primary">{stock.symbol.slice(0, 2)}</span>
       </div>
       {/* Info */}
@@ -118,7 +118,7 @@ function StockRow({ stock, rank }: { stock: Stock; rank?: number }) {
       {/* Sparkline */}
       <Sparkline symbol={stock.symbol} positive={positive} />
       {/* Price */}
-      <div className="text-right flex-shrink-0 min-w-[90px]">
+      <div className="text-right shrink-0 min-w-[90px]">
         <p className="text-sm font-bold num text-foreground">{formatCurrency(stock.price)}</p>
         <p className={cn("text-[11px] font-semibold num", positive ? "text-bull" : "text-bear")}>
           {positive ? "+" : ""}{formatPercent(stock.changePercent)}
@@ -127,7 +127,7 @@ function StockRow({ stock, rank }: { stock: Stock; rank?: number }) {
       {/* Watchlist star */}
       <button
         onClick={toggleWL}
-        className={cn("flex-shrink-0 p-1 rounded transition-colors", inWL ? "text-yellow-400" : "text-muted-foreground/40 hover:text-yellow-400")}
+        className={cn("shrink-0 p-1 rounded transition-colors", inWL ? "text-yellow-400" : "text-muted-foreground/40 hover:text-yellow-400")}
       >
         <Star className="w-3.5 h-3.5" fill={inWL ? "currentColor" : "none"} />
       </button>
@@ -216,7 +216,7 @@ export default function ExplorePage() {
   const FILTERS = ["All", "Tech", "Finance", "Energy", "Retail", "Healthcare"];
 
   return (
-    <div className="max-w-[1700px] mx-auto px-4 lg:px-6 py-6 space-y-8">
+    <div className="max-w-[1700px] mx-auto px-3 sm:px-4 lg:px-6 py-4 sm:py-6 space-y-6 sm:space-y-8">
 
       {/* ── Indices Strip ── */}
       <section>
@@ -323,7 +323,7 @@ export default function ExplorePage() {
                 { name: "Pharma", change: -0.18, color: "#eb5b3c" },
               ].map((sec) => (
                 <div key={sec.name} className="flex items-center gap-2">
-                  <span className="text-xs text-muted-foreground w-20 flex-shrink-0">{sec.name}</span>
+                  <span className="text-xs text-muted-foreground w-20 shrink-0">{sec.name}</span>
                   <div className="flex-1 bg-muted rounded-full h-1.5 overflow-hidden">
                     <div
                       className="h-full rounded-full transition-all"
@@ -333,7 +333,7 @@ export default function ExplorePage() {
                       }}
                     />
                   </div>
-                  <span className={cn("text-xs font-semibold num w-12 text-right flex-shrink-0", sec.change >= 0 ? "text-bull" : "text-bear")}>
+                  <span className={cn("text-xs font-semibold num w-12 text-right shrink-0", sec.change >= 0 ? "text-bull" : "text-bear")}>
                     {sec.change >= 0 ? "+" : ""}{formatPercent(sec.change)}
                   </span>
                 </div>
@@ -398,7 +398,7 @@ export default function ExplorePage() {
                           {article.feedType === "live" ? "Live" : "Fallback"}
                         </Badge>
                         <span className="text-[10px] text-muted-foreground">{article.source}</span>
-                        {article.published && <span className="text-[9px] text-muted-foreground/70 ml-auto">{article.published}</span>}
+                        {article.published && <span className="text-[9px] text-muted-foreground/70 ml-auto">{new Date(article.published).toLocaleDateString("en-US", { month: "short", day: "numeric" })}</span>}
                       </div>
                       <p className="text-xs font-semibold text-foreground leading-relaxed group-hover:text-primary transition-colors line-clamp-2">
                         {article.title}
@@ -469,7 +469,7 @@ export default function ExplorePage() {
                   >
                     <td className="px-3 py-2.5">
                       <div className="flex items-center gap-2.5">
-                        <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
+                        <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
                           <span className="text-[9px] font-black text-primary">{s.symbol.slice(0, 2)}</span>
                         </div>
                         <div>

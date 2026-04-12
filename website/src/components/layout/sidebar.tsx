@@ -1,4 +1,5 @@
 "use client";
+import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
@@ -13,7 +14,6 @@ import {
   ChevronRight,
   Zap,
   BarChart2,
-  DollarSign,
 } from "lucide-react";
 import { useState } from "react";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
@@ -47,8 +47,15 @@ export function Sidebar() {
         "flex items-center gap-3 px-4 py-5 border-b border-sidebar-border",
         collapsed && "justify-center px-0"
       )}>
-        <div className="flex-shrink-0 w-9 h-9 rounded-xl bg-primary flex items-center justify-center shadow-lg animate-pulse-glow">
-          <DollarSign className="w-5 h-5 text-primary-foreground" />
+        <div className="shrink-0 w-9 h-9 flex items-center justify-center">
+          <Image
+            src="/logo.png"
+            alt="TradeIQ Logo"
+            width={36}
+            height={36}
+            className="object-contain"
+            priority
+          />
         </div>
         {!collapsed && (
           <div className="overflow-hidden">
@@ -85,7 +92,7 @@ export function Sidebar() {
                     collapsed && "justify-center px-0"
                   )}
                 >
-                  <Icon className={cn("w-4.5 h-4.5 flex-shrink-0", isActive && "text-primary")} size={18} />
+                  <Icon className={cn("w-4.5 h-4.5 shrink-0", isActive && "text-primary")} size={18} />
                   {!collapsed && <span>{label}</span>}
                 </Link>
               } />

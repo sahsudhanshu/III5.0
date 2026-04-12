@@ -35,6 +35,8 @@ logger = logging.getLogger(__name__)
 
 MAX_SHORT_TERM_MESSAGES = 20
 MAX_LONG_TERM_CHARS = 4000
+MAX_TOOL_OUTPUTS = 6
+MAX_TOOL_CONTENT_CHARS = 1200
 
 # All tools available to the agent
 TOOLS = [get_market_snapshot, search_financial_news, web_search]
@@ -51,86 +53,37 @@ def _get_agent_llm() -> ChatOpenAI:
         api_key=settings.nvidia_api_key,
         base_url=settings.nvidia_base_url,
         temperature=0.2,
-        max_tokens=2048,
+        max_tokens=768,
     )
     # Bind tools to LLM
     return llm.bind_tools(TOOLS)
 
 
+def _get_planner_llm() -> ChatOpenAI:
+    """Get LLM for planner output (no tools)."""
+    settings = get_settings()
+    return ChatOpenAI(
+        model=settings.nvidia_model,
+        api_key=settings.nvidia_api_key,
+        base_url=settings.nvidia_base_url,
+        temperature=0.2,
+        max_tokens=512,
+    )
+
+
 def _build_system_prompt() -> str:
     """Build system prompt with comprehensive tool information."""
-    return """You are a professional trading analysis agent with access to multiple financial tools.
+    return """You are a trading analysis agent. Use tools for current data.
 
-YOUR AVAILABLE TOOLS:
+TOOLS:
 
-1. **get_market_snapshot** - Market data with historical time series
-   Purpose: Analyze price trends, technical patterns, volatility, and market statistics
-   Parameters:
-     - symbols (list): Stock tickers (e.g., ['AAPL', 'MSFT'])
-     - period (str): Historical period ('1y', '2y', '3y', '5y', 'max')
-   Returns:
-     - Formatted summary plus JSON with arrays of dates and OHLCV data
-   Use When:
-     ✓ Performing technical analysis
-     ✓ Identifying trends and support/resistance
-     ✓ Calculating volatility metrics
-     ✓ Comparing multiple stocks visually
-     ✓ Preparing visualization data
+1) get_market_snapshot: symbols (list), period ('1y','2y','3y','5y','max'). Returns OHLCV arrays + summary.
 
-2. **search_financial_news** - Financial news using gnews with fallback
-   Purpose: Research corporate events, market sentiment, and news-driven catalysts
-   Parameters:
-     - query (str): Financial news search query (e.g., "Apple earnings", "Fed rate decision")
-    - max_results (int): Max results (default 5, max 20)
-   Returns:
-     - List of articles with title, summary, source, URL, published date, relevance score
-   Use When:
-     ✓ Analyzing earnings announcements
-     ✓ Assessing geopolitical impacts
-     ✓ Tracking regulatory news
-     ✓ Evaluating CEO/leadership changes
-     ✓ Monitoring industry trends
+2) search_financial_news: query, max_results (<=20). Returns articles list.
 
-3. **web_search** - General web search for financial information
-   Purpose: Find supporting data, analyst reports, and broader context
-   Parameters:
-    - query (str): General search query
-    - max_results (int): Max results (default 5)
-   Returns:
-     - List of search results with relevance scoring
-   Use When:
-     ✓ Finding analyst reports
-     ✓ Researching company fundamentals
-     ✓ Gathering industry context
-     ✓ Fact-checking information
-     ✓ Deep-diving into specific topics
+3) web_search: query, max_results (<=10). Returns web results.
 
-YOUR ANALYSIS FRAMEWORK:
-
-1. Data Collection: Use tools to gather relevant market and news data
-2. Technical Analysis: Analyze price patterns, trends, support/resistance from get_market_snapshot
-3. Sentiment Analysis: Assess news sentiment and potential market catalysts
-4. Risk Assessment: Evaluate volatility, news risk, and market conditions
-5. Recommendation: Synthesize all data into actionable trading insights
-
-RESPONSE FORMAT:
-
-Structure your analysis with:
-- Market Overview: Current prices, trends, volatility from snapshot
-- Technical Analysis: Support/resistance, trend direction, chart patterns
-- News Analysis: Recent events, sentiment, potential catalysts
-- Risk Assessment: Downside risks, volatility considerations
-- Trading Recommendation: Entry/exit prices with clear rationale
-- Data Citation: Always cite specific sources and data points
-
-IMPORTANT GUIDELINES:
-
-- Always use available tools for current data - do NOT use training data for prices
-- Provide specific price targets with supporting analysis
-- Include risk/reward ratios in recommendations
-- Acknowledge uncertainty in your analysis
-- Prioritize data accuracy over speculation
-- Use tool data as primary evidence, not opinions
+Reply with a concise recommendation and cite tool data. If unsure, say HOLD.
 """
 
 
@@ -249,18 +202,31 @@ async def tool_executor_node(state: AgentState) -> Dict[str, Any]:
         return_exceptions=True
     )
     
+    tool_outputs = list(state.get("tool_outputs", []))
+
     # Add tool results as ToolMessages
     for tr in tool_results:
         if isinstance(tr, Exception):
             logger.error(f"Tool execution exception: {tr}")
             continue
         
+        content = tr["result"]
+        if isinstance(content, str) and len(content) > MAX_TOOL_CONTENT_CHARS:
+            content = content[:MAX_TOOL_CONTENT_CHARS] + "..."
         messages.append(ToolMessage(
-            content=tr["result"],
+            content=content,
             tool_call_id=tr["call"]["id"]
         ))
+        tool_outputs.append({
+            "tool": tr["tool"],
+            "args": tr["args"],
+            "result": tr["result"][:500],
+        })
+
+    if len(tool_outputs) > MAX_TOOL_OUTPUTS:
+        tool_outputs = tool_outputs[-MAX_TOOL_OUTPUTS:]
     
-    return {"messages": messages}
+    return {"messages": messages, "tool_outputs": tool_outputs}
 
 
 def route_after_agent(state: AgentState) -> Literal["tool_executor_node", "end"]:
@@ -315,6 +281,42 @@ async def memory_update_node(state: AgentState) -> Dict[str, Any]:
     return {"messages": messages}
 
 
+async def planner_node(state: AgentState) -> Dict[str, Any]:
+    """Generate a buy/sell/hold suggestion based on tool outputs and context."""
+    tool_outputs = state.get("tool_outputs", [])
+    user_input = (state.get("human_input") or "").strip()
+    last_ai = _get_last_ai_text(state.get("messages", [])) or ""
+
+    if not tool_outputs and not last_ai:
+        return {}
+
+    planner_prompt = """You are a trading planner. Use the provided tool outputs and context to suggest a clear action: BUY, SELL, or HOLD.
+
+Rules:
+- If data is missing or low confidence, recommend HOLD and say why.
+- Provide 2-4 bullet points with rationale.
+- Be concise and avoid speculation beyond the data.
+"""
+
+    payload = {
+        "user_query": user_input,
+        "tool_outputs": tool_outputs,
+        "assistant_response": last_ai,
+    }
+
+    llm = _get_planner_llm()
+    response = await llm.ainvoke(
+        [
+            SystemMessage(content=planner_prompt),
+            HumanMessage(content=str(payload)),
+        ]
+    )
+
+    messages = list(state.get("messages", []))
+    messages.append(AIMessage(content=response.content))
+    return {"messages": messages}
+
+
 def build_graph() -> StateGraph:
     """Build and compile the trading agent graph."""
     builder = StateGraph(AgentState)
@@ -323,6 +325,7 @@ def build_graph() -> StateGraph:
     builder.add_node("agent_node", agent_node)
     builder.add_node("tool_executor_node", tool_executor_node)
     builder.add_node("memory_update", memory_update_node)
+    builder.add_node("planner", planner_node)
     
     # Set entry point
     builder.set_entry_point("agent_node")
@@ -341,7 +344,8 @@ def build_graph() -> StateGraph:
     builder.add_edge("tool_executor_node", "agent_node")
 
     # Final memory update -> end
-    builder.add_edge("memory_update", END)
+    builder.add_edge("memory_update", "planner")
+    builder.add_edge("planner", END)
     
     return builder.compile()
 

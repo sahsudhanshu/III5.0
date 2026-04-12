@@ -91,11 +91,12 @@ class SectorRequest(BaseModel):
 
 
 class SectorHeadlinesRequest(BaseModel):
+    num_news: int = Field(..., ge=1, le=200, description="Number of provided headlines")
     headlines: list[str] = Field(
         ...,
-        min_length=50,
-        max_length=50,
-        description="Exactly 50 externally-fetched news headlines",
+        min_length=1,
+        max_length=200,
+        description="Externally-fetched news headlines",
     )
 
 
@@ -126,8 +127,11 @@ def sector_sentiment(req: SectorRequest):
 def sector_sentiment_headlines(req: SectorHeadlinesRequest):
     # News fetching is expected outside this API. We only score provided headlines.
     cleaned = [h.strip() for h in req.headlines if h and h.strip()]
-    if len(cleaned) != 50:
-        raise HTTPException(status_code=400, detail="headlines must contain exactly 50 non-empty strings")
+    if len(cleaned) != req.num_news:
+        raise HTTPException(
+            status_code=400,
+            detail=f"num_news ({req.num_news}) must match non-empty headlines count ({len(cleaned)})",
+        )
 
     engine = get_sector_engine()
     result = engine.analyze_headlines(cleaned, sector_query="HEADLINES")
@@ -155,6 +159,7 @@ def sector_sentiment_headlines(req: SectorHeadlinesRequest):
         "overall_sentiment": overall,
         "sentiment_score": result["sentiment_score"],
         "signal": result["signal"],
+        "per_news_sentiment": result.get("per_news_sentiment", []),
         "timestamp": result["timestamp"],
     }
 

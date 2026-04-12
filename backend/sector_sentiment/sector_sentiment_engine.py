@@ -87,6 +87,17 @@ class SectorSentimentEngine:
         neg_pct = (neg / total) * 100
         neu_pct = (neu / total) * 100
 
+        per_news = []
+        for i, headline in enumerate(headlines):
+            label = self.id2label[preds[i]]
+            per_news.append(
+                {
+                    "index": i + 1,
+                    "headline": headline,
+                    "sentiment": label,
+                }
+            )
+
         return {
             "sector": sector_query,
             "total_headlines": total,
@@ -99,6 +110,7 @@ class SectorSentimentEngine:
             "sentiment_score": score,
             "signal": signal,
             "confidence": confidence,
+            "per_news_sentiment": per_news,
             "timestamp": datetime.now().isoformat()
         }
 

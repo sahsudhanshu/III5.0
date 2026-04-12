@@ -225,10 +225,10 @@ def _get_raw_mock_financial_news(query: str, max_results: int) -> list:
     return articles_to_show
 
 
-async def fetch_sector_sentiment(headlines: list[str]) -> dict:
+async def fetch_sector_sentiment(num_news: int, headlines: list[str]) -> dict:
     """Fetch sentiment from HF Space API using externally-fetched headlines."""
     url = "https://SaqlainSQX-iii5-backend.hf.space/sector-sentiment-headlines"
-    data = json.dumps({"headlines": headlines}).encode("utf-8")
+    data = json.dumps({"num_news": num_news, "headlines": headlines}).encode("utf-8")
     req = urllib.request.Request(url, data=data, headers={"Content-Type": "application/json"}, method="POST")
 
     loop = asyncio.get_event_loop()
@@ -299,7 +299,7 @@ async def analyze_sector_sentiment(sector: str) -> str:
     """
     print(f"📊 [SENTIMENT] analyze_sector_sentiment called → sector={sector!r}")
     headlines = await fetch_sector_headlines(sector, desired_count=50)
-    data = await fetch_sector_sentiment(headlines)
+    data = await fetch_sector_sentiment(len(headlines), headlines)
     
     if not data:
         return f"Could not fetch sentiment for sector: {sector}. The backend service might be unavailable."
@@ -318,5 +318,11 @@ async def analyze_sector_sentiment(sector: str) -> str:
         f"- Sentiment Score: {data.get('sentiment_score', 0)}",
         f"- Signal: {data.get('signal', 'UNKNOWN')}",
     ]
+    per_news = data.get("per_news_sentiment", [])
+    if per_news:
+        lines.append("")
+        lines.append("**Per-Headline Sentiment (Top 5 shown):**")
+        for item in per_news[:5]:
+            lines.append(f"- [{item.get('sentiment', 'UNKNOWN')}] {item.get('headline', '')}")
     
     return "\n".join(lines)

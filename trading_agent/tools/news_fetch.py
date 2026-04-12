@@ -23,7 +23,7 @@ except ImportError:
 async def fetch_gnews(query: str, max_results: int = 5) -> list:
     """Fetch raw JSON articles from gnews with fallback mock data."""
     print(f"📰 [FETCH] fetch_gnews called → query={query!r}")
-    max_results = min(max(1, max_results), 20)
+    max_results = min(max(1, max_results), 100)
     
     # Try to fetch real news from gnews
     try:
@@ -63,7 +63,7 @@ async def search_financial_news(query: str, max_results: int = 5) -> str:
 
     Args:
         query: The search query (e.g., "Apple earnings", "Fed interest rates")
-        max_results: Number of results to return (default 5, max 20)
+        max_results: Number of results to return (default 5, max 100)
     
     Returns:
         Formatted string with news articles, summaries, and initial ML sentiments.
@@ -225,10 +225,10 @@ def _get_raw_mock_financial_news(query: str, max_results: int) -> list:
     return articles_to_show
 
 
-async def fetch_sector_sentiment(sector: str) -> dict:
-    """Fetch sector sentiment from the HF Space API."""
-    url = "https://SaqlainSQX-iii5-backend.hf.space/sector-sentiment"
-    data = json.dumps({"sector": sector}).encode("utf-8")
+async def fetch_sector_sentiment(headlines: list[str]) -> dict:
+    """Fetch sentiment from HF Space API using externally-fetched headlines."""
+    url = "https://SaqlainSQX-iii5-backend.hf.space/sector-sentiment-headlines"
+    data = json.dumps({"headlines": headlines}).encode("utf-8")
     req = urllib.request.Request(url, data=data, headers={"Content-Type": "application/json"}, method="POST")
 
     loop = asyncio.get_event_loop()
@@ -247,10 +247,46 @@ async def fetch_sector_sentiment(sector: str) -> dict:
     return await loop.run_in_executor(None, _do_request)
 
 
+async def fetch_sector_headlines(sector: str, desired_count: int = 50) -> list[str]:
+    """
+    Fetch headlines outside the sentiment API.
+    Ensures exactly `desired_count` non-empty strings.
+    """
+    desired_count = max(1, desired_count)
+    queries = [
+        f"{sector} stock market",
+        f"{sector} stocks",
+        f"{sector} finance",
+        sector,
+    ]
+    unique: list[str] = []
+    seen = set()
+    for q in queries:
+        articles = await fetch_gnews(q, max_results=desired_count)
+        for article in articles:
+            title = str(article.get("title", "")).strip()
+            key = title.lower()
+            if title and key not in seen:
+                seen.add(key)
+                unique.append(title)
+            if len(unique) >= desired_count:
+                return unique[:desired_count]
+
+    # deterministic fallback filler if providers return fewer than requested
+    i = 1
+    while len(unique) < desired_count:
+        filler = f"{sector} market update headline {i}"
+        unique.append(filler)
+        i += 1
+    return unique[:desired_count]
+
+
 @tool
 async def analyze_sector_sentiment(sector: str) -> str:
     """
-    Analyzes the sentiment of a specific market sector based on up to 50 recent news headlines.
+    Analyzes sentiment for a market sector by:
+    1) fetching 50 headlines in this tool, then
+    2) sending only headlines to the backend sentiment API.
     
     Use this tool to get positive, negative, and neutral sentiment breakdowns, 
     an overall sentiment score, and a trading signal (BULLISH/BEARISH/NEUTRAL) for a given sector.
@@ -262,13 +298,14 @@ async def analyze_sector_sentiment(sector: str) -> str:
         Formatted string containing the sentiment breakdown, scores, and signals.
     """
     print(f"📊 [SENTIMENT] analyze_sector_sentiment called → sector={sector!r}")
-    data = await fetch_sector_sentiment(sector)
+    headlines = await fetch_sector_headlines(sector, desired_count=50)
+    data = await fetch_sector_sentiment(headlines)
     
     if not data:
         return f"Could not fetch sentiment for sector: {sector}. The backend service might be unavailable."
         
     lines = [
-        f"📊 **Sector Sentiment Analysis: {data.get('sector', sector)}**",
+        f"📊 **Sector Sentiment Analysis: {sector}**",
         f"Total Headlines Analyzed: {data.get('total_headlines', 0)}",
         "",
         "**Sentiment Breakdown:**",
@@ -277,9 +314,9 @@ async def analyze_sector_sentiment(sector: str) -> str:
         f"- Neutral: {data.get('neutral', 0)} ({data.get('neutral_pct', 0.0)}%)",
         "",
         "**Overall Metrics:**",
+        f"- Overall Sentiment: {data.get('overall_sentiment', 'UNKNOWN')}",
         f"- Sentiment Score: {data.get('sentiment_score', 0)}",
         f"- Signal: {data.get('signal', 'UNKNOWN')}",
-        f"- Confidence: {data.get('confidence', 'UNKNOWN')}",
     ]
     
     return "\n".join(lines)

@@ -6,8 +6,8 @@
 @custom-variant dark (&:is(.dark *));
 
 /* ============================================================
-   GROWW-INSPIRED DESIGN SYSTEM
-   Primary: #00d09c | Danger: #eb5b3c
+  TRADEIQ DESIGN SYSTEM
+  Palette: Warm Editorial (Paper, Espresso, Terracotta, Sage)
    ============================================================ */
 
 @theme inline {
@@ -61,115 +61,122 @@
 }
 
 /* ============================================================
-   LIGHT THEME — Groww White
+  LIGHT THEME — Cream and Charcoal Minimal
    ============================================================ */
 :root {
-  --background: #f4f7f9;
-  --foreground: #44475b;
+  --background: #f8f6f1;
+  --foreground: #222222;
 
-  --card: #ffffff;
-  --card-foreground: #44475b;
+  --card: #fffdf9;
+  --card-foreground: #222222;
 
-  --popover: #ffffff;
-  --popover-foreground: #44475b;
+  --popover: #fffdf9;
+  --popover-foreground: #222222;
 
-  /* Groww Green */
-  --primary: #00d09c;
-  --primary-foreground: #ffffff;
+  --primary: #3b3b3b;
+  --primary-foreground: #f9f8f6;
 
-  --secondary: #f0f3f7;
-  --secondary-foreground: #44475b;
+  --secondary: #ece9e2;
+  --secondary-foreground: #3d3d3d;
 
-  --muted: #f0f3f7;
-  --muted-foreground: #7c7e8c;
+  --muted: #f1eee8;
+  --muted-foreground: #707070;
 
-  --accent: #e8faf5;
-  --accent-foreground: #00d09c;
+  --accent: #ece9e2;
+  --accent-foreground: #3b3b3b;
 
-  /* Groww Red */
-  --destructive: #eb5b3c;
+  --destructive: #b65d50;
 
-  --border: #e0e3eb;
-  --input: #f0f3f7;
-  --ring: #00d09c;
+  --border: #e7e2d8;
+  --input: #f0ede6;
+  --ring: #3b3b3b;
 
   /* Chart palette */
-  --chart-1: #00d09c;
-  --chart-2: #5367ff;
-  --chart-3: #ff9800;
-  --chart-4: #9c27b0;
-  --chart-5: #eb5b3c;
+  --chart-1: #3b3b3b;
+  --chart-2: #626262;
+  --chart-3: #8c8c8c;
+  --chart-4: #a7a7a7;
+  --chart-5: #b65d50;
 
   --radius: 0.625rem;
 
   /* Sidebar (unused but kept for shadcn compat) */
-  --sidebar: #ffffff;
-  --sidebar-foreground: #44475b;
-  --sidebar-primary: #00d09c;
-  --sidebar-primary-foreground: #ffffff;
-  --sidebar-accent: #f0f3f7;
-  --sidebar-accent-foreground: #44475b;
-  --sidebar-border: #e0e3eb;
-  --sidebar-ring: #00d09c;
+  --sidebar: #fffdf9;
+  --sidebar-foreground: #222222;
+  --sidebar-primary: #3b3b3b;
+  --sidebar-primary-foreground: #f9f8f6;
+  --sidebar-accent: #ece9e2;
+  --sidebar-accent-foreground: #222222;
+  --sidebar-border: #e7e2d8;
+  --sidebar-ring: #3b3b3b;
 
   /* Trading */
-  --bull: #00d09c;
-  --bear: #eb5b3c;
-  --bull-muted: #e8faf5;
-  --bear-muted: #fdf0ed;
+  --bull: #3f7d63;
+  --bear: #b65d50;
+  --bull-muted: #e8f0ec;
+  --bear-muted: #f6e7e4;
+
+  /* Atmosphere */
+  --bg-glow-1: rgba(59, 59, 59, 0.06);
+  --bg-glow-2: rgba(120, 120, 120, 0.04);
+  --selection: rgba(59, 59, 59, 0.18);
 }
 
 /* ============================================================
-   DARK THEME — Groww Dark
+   DARK THEME — Warm Editorial Dark
    ============================================================ */
 .dark {
-  --background: #1a1a2e;
-  --foreground: #e8eaf0;
+  --background: #1c1713;
+  --foreground: #f1e6d9;
 
-  --card: #222236;
-  --card-foreground: #e8eaf0;
+  --card: #2a221c;
+  --card-foreground: #f1e6d9;
 
-  --popover: #222236;
-  --popover-foreground: #e8eaf0;
+  --popover: #2a221c;
+  --popover-foreground: #f1e6d9;
 
-  /* Groww Green stays */
-  --primary: #00d09c;
-  --primary-foreground: #0f1923;
+  --primary: #d08a5f;
+  --primary-foreground: #1b130e;
 
-  --secondary: #2a2a42;
-  --secondary-foreground: #c8cad8;
+  --secondary: #3a2f26;
+  --secondary-foreground: #e3d1c0;
 
-  --muted: #2a2a42;
-  --muted-foreground: #7c7e97;
+  --muted: #342920;
+  --muted-foreground: #b59f8a;
 
-  --accent: #1a3a32;
-  --accent-foreground: #00d09c;
+  --accent: #45362a;
+  --accent-foreground: #e0aa7b;
 
-  --destructive: #eb5b3c;
+  --destructive: #d46a5b;
 
-  --border: rgba(255,255,255,0.08);
-  --input: rgba(255,255,255,0.06);
-  --ring: #00d09c;
+  --border: rgba(230, 200, 170, 0.18);
+  --input: rgba(240, 215, 185, 0.12);
+  --ring: #d08a5f;
 
-  --chart-1: #00d09c;
-  --chart-2: #7b87ff;
-  --chart-3: #ffb347;
-  --chart-4: #ce93d8;
-  --chart-5: #ff7a5c;
+  --chart-1: #d08a5f;
+  --chart-2: #89a36b;
+  --chart-3: #d4a44b;
+  --chart-4: #b9859b;
+  --chart-5: #d46a5b;
 
-  --sidebar: #1a1a2e;
-  --sidebar-foreground: #e8eaf0;
-  --sidebar-primary: #00d09c;
-  --sidebar-primary-foreground: #0f1923;
-  --sidebar-accent: #2a2a42;
-  --sidebar-accent-foreground: #e8eaf0;
-  --sidebar-border: rgba(255,255,255,0.06);
-  --sidebar-ring: #00d09c;
+  --sidebar: #1c1713;
+  --sidebar-foreground: #f1e6d9;
+  --sidebar-primary: #d08a5f;
+  --sidebar-primary-foreground: #1b130e;
+  --sidebar-accent: #3a2f26;
+  --sidebar-accent-foreground: #f1e6d9;
+  --sidebar-border: rgba(230, 200, 170, 0.14);
+  --sidebar-ring: #d08a5f;
 
-  --bull: #00d09c;
-  --bear: #eb5b3c;
-  --bull-muted: #0d2a22;
-  --bear-muted: #2d1610;
+  --bull: #63b07e;
+  --bear: #e18779;
+  --bull-muted: #22392a;
+  --bear-muted: #3b2421;
+
+  /* Atmosphere */
+  --bg-glow-1: rgba(208, 138, 95, 0.11);
+  --bg-glow-2: rgba(137, 163, 107, 0.08);
+  --selection: rgba(208, 138, 95, 0.28);
 }
 
 /* ============================================================
@@ -188,12 +195,16 @@
   body {
     @apply bg-background text-foreground;
     text-rendering: optimizeLegibility;
+    background-image:
+      radial-gradient(1200px 520px at -15% -20%, var(--bg-glow-1), transparent 55%),
+      radial-gradient(900px 460px at 120% -15%, var(--bg-glow-2), transparent 55%);
+    background-attachment: fixed;
   }
 
   ::-webkit-scrollbar { width: 5px; height: 5px; }
   ::-webkit-scrollbar-track { background: transparent; }
   ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 100px; }
-  ::selection { background: rgba(0,208,156,0.18); }
+  ::selection { background: var(--selection); }
 }
 
 /* ============================================================
@@ -223,7 +234,7 @@
 
   /* Gradient text */
   .gradient-text {
-    background: linear-gradient(135deg, #00d09c, #00b8a9);
+    background: linear-gradient(135deg, var(--primary), #7a7a7a);
     -webkit-background-clip: text;
     -webkit-text-fill-color: transparent;
     background-clip: text;
@@ -237,7 +248,7 @@
     left: 0;
     right: 0;
     height: 2px;
-    background: #00d09c;
+    background: var(--primary);
     border-radius: 8px 8px 0 0;
   }
 }
@@ -255,11 +266,11 @@
 }
 @keyframes price-up {
   0%,100% { background: transparent; }
-  50%     { background: rgba(0,208,156,.15); }
+  50%     { background: rgba(99,176,126,.18); }
 }
 @keyframes price-down {
   0%,100% { background: transparent; }
-  50%     { background: rgba(235,91,60,.15); }
+  50%     { background: rgba(212,106,91,.18); }
 }
 @keyframes ticker-scroll {
   0%   { transform: translateX(0); }
@@ -272,20 +283,20 @@
 .flash-down         { animation: price-down 0.5s ease; }
 
 
-/* Groww green button overrides */
+/* Primary action button overrides */
 .btn-groww {
-  background: #00d09c;
+  background: var(--primary);
   color: #fff;
   border-radius: 8px;
   font-weight: 600;
   transition: background 0.15s;
 }
-.btn-groww:hover { background: #00b88a; }
+.btn-groww:hover { filter: brightness(0.94); }
 .btn-sell {
-  background: #eb5b3c;
+  background: var(--bear);
   color: #fff;
   border-radius: 8px;
   font-weight: 600;
   transition: background 0.15s;
 }
-.btn-sell:hover { background: #d14d32; }
+.btn-sell:hover { filter: brightness(0.94); }

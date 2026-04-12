@@ -4,3 +4,13 @@ langchain-openai>=0.2.0
 python-dotenv>=1.0.1
 requests>=2.32.0
 yfinance>=0.2.32
+
+# ML / inference
+numpy>=1.26.0
+torch
+transformers>=4.40.0
+scikit-learn>=1.3.0
+
+# News + LLM (optional at runtime)
+gnews>=0.3.9
+google-generativeai>=0.7.0

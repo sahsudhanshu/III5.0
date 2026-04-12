@@ -5,3 +5,6 @@ __pycache__/
 trading_memory.db
 final_trading_model
 outputs/
+
+# Large local model bundles (do not commit)
+backend/stock_price_prediction/*.pt

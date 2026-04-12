@@ -1,6 +1,6 @@
 "use client";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useState } from "react";
 import { signIn } from "next-auth/react";
 import { Input } from "@/components/ui/input";
@@ -15,6 +15,9 @@ const STRENGTH_RULES = [
 
 export default function SignupPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const rawCallback = searchParams.get("callbackUrl") || "/dashboard";
+  const callbackUrl = rawCallback.startsWith("/") ? rawCallback : "/dashboard";
   const [isLoading, setIsLoading] = useState(false);
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
@@ -58,12 +61,13 @@ export default function SignupPage() {
         email,
         password,
         redirect: false,
+        callbackUrl,
       });
 
       if (loginRes?.error) {
         toast.error("An error occurred during automatic sign-in.");
       } else {
-        router.push("/dashboard");
+        router.push(callbackUrl);
         router.refresh();
       }
     } catch {
@@ -74,7 +78,7 @@ export default function SignupPage() {
   };
 
   const handleGoogleSignup = () => {
-    signIn("google", { callbackUrl: "/dashboard" });
+    signIn("google", { callbackUrl });
   };
 
   return (
@@ -199,7 +203,7 @@ export default function SignupPage() {
 
         <p className="text-center text-sm text-muted-foreground mt-6">
           Already have an account?{" "}
-          <Link href="/auth/login" className="text-primary font-medium hover:underline">
+          <Link href={`/auth/login?callbackUrl=${encodeURIComponent(callbackUrl)}`} className="text-primary font-medium hover:underline">
             Sign in
           </Link>
         </p>

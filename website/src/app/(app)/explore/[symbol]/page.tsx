@@ -177,15 +177,17 @@ export default function StockDetailPage() {
     };
   }, [targetSymbol, subscribe, unsubscribe]);
 
+  const { requireAuth, isAuthenticated } = useRequireAuth();
+
   useEffect(() => {
-    fetchPortfolio();
-  }, [fetchPortfolio]);
+    if (isAuthenticated) {
+      fetchPortfolio();
+    }
+  }, [fetchPortfolio, isAuthenticated]);
 
   // Derived values
   const isPositive = (stock?.changePercent ?? 0) >= 0;
   const inWatchlist = stock ? isInWatchlist(stock.symbol) : false;
-
-  const { requireAuth } = useRequireAuth();
 
   const toggleWatchlist = () => {
     requireAuth(() => {
@@ -197,7 +199,7 @@ export default function StockDetailPage() {
         addToWatchlist({ symbol: stock.symbol, name: stock.name, exchange: stock.exchange, price: stock.price, change: stock.change, changePercent: stock.changePercent, volume: stock.volume, addedAt: new Date().toISOString() });
         toast.success(`${stock.symbol} added to watchlist ⭐`);
       }
-    });
+    }, "Sign in to update your watchlist");
   };
 
   const handleOrder = async () => {
@@ -235,7 +237,7 @@ export default function StockDetailPage() {
           description: `@ ${formatCurrency(stock.price)} · Total: ${formatCurrency(total)}`,
         });
       }
-    });
+    }, "Sign in to place buy or sell orders");
   };
 
   if (!loading && !stock) {
@@ -302,7 +304,7 @@ export default function StockDetailPage() {
                       {inWatchlist ? "Watching" : "Add to watchlist"}
                     </button>
                     <button
-                      onClick={() => openChat()}
+                      onClick={() => requireAuth(() => openChat(), "Sign in to use AI insights and recommendations")}
                       className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-border text-xs font-semibold text-muted-foreground hover:text-primary hover:border-primary/50 transition-all"
                     >
                       <Bot className="w-3.5 h-3.5" /> Ask AI

@@ -91,7 +91,7 @@ def _build_system_prompt() -> str:
    Use for: price analysis, technical data, historical OHLCV, comparisons
 
 2) search_financial_news: query (str), max_results (<=20)
-   Use for: earnings news, market sentiment, company events, sector updates
+   Use for: earnings news, market sentiment, company events. NOTE: Output includes a basic ML sentiment for each article. You MUST use your own internal knowledge to determine the final company-specific sentiment (positive/negative/neutral) and explain why.
 
 3) web_search: query (str), max_results (<=10)
    Use for: broader context, analyst reports, regulatory news

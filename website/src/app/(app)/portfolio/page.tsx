@@ -87,10 +87,13 @@ export default function PortfolioPage() {
   const [timeRange, setTimeRange] = useState("3M");
   const [fundsModal, setFundsModal] = useState<"DEPOSIT" | "WITHDRAW" | null>(null);
   const [fundsLoading, setFundsLoading] = useState(false);
+  const { isAuthenticated, requireAuth } = useRequireAuth();
 
   useEffect(() => {
-    fetchPortfolio();
-  }, [fetchPortfolio]);
+    if (isAuthenticated) {
+      fetchPortfolio();
+    }
+  }, [fetchPortfolio, isAuthenticated]);
 
   // Enrich holdings with live Finnhub prices whenever prices tick
   const priceMap = useCallback(() => {
@@ -131,8 +134,6 @@ export default function PortfolioPage() {
     setFundsModal(null);
   };
 
-  const { isAuthenticated, requireAuth } = useRequireAuth();
-
   if (!isAuthenticated) {
     return (
       <div className="p-6 max-w-screen-xl mx-auto flex flex-col items-center justify-center min-h-[60vh] text-center">
@@ -144,7 +145,7 @@ export default function PortfolioPage() {
           Sign in to view your personalized portfolio, track live P&L, manage holdings, and deposit funds to your paper trading account.
         </p>
         <button
-          onClick={() => requireAuth(() => {})}
+          onClick={() => requireAuth(() => {}, "Sign in to view and manage your portfolio")}
           className="px-6 py-3 bg-primary text-primary-foreground font-bold rounded-xl shadow-[0_0_20px_rgba(0,208,156,0.2)] hover:shadow-[0_0_30px_rgba(0,208,156,0.4)] transition-all"
         >
           Authenticate to View

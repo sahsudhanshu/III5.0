@@ -1,6 +1,6 @@
 "use client";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useState } from "react";
 import { signIn } from "next-auth/react";
 import { Eye, EyeOff, Activity } from "lucide-react";
@@ -9,6 +9,9 @@ import { motion } from "framer-motion";
 
 export default function LoginPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const rawCallback = searchParams.get("callbackUrl") || "/dashboard";
+  const callbackUrl = rawCallback.startsWith("/") ? rawCallback : "/dashboard";
   const [isLoading, setIsLoading] = useState(false);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -24,13 +27,14 @@ export default function LoginPage() {
         email,
         password,
         redirect: false,
+        callbackUrl,
       });
 
       if (res?.error) {
         toast.error("Invalid credentials.");
       } else {
         toast.success("Welcome back! 🎉");
-        router.push("/dashboard");
+        router.push(callbackUrl);
         router.refresh();
       }
     } catch {
@@ -41,7 +45,7 @@ export default function LoginPage() {
   };
 
   const handleGoogleLogin = () => {
-    signIn("google", { callbackUrl: "/dashboard" });
+    signIn("google", { callbackUrl });
   };
 
   return (
@@ -154,7 +158,7 @@ export default function LoginPage() {
 
         <p className="text-sm text-white/50 text-center mt-8 font-medium">
           No account yet?{" "}
-          <Link href="/auth/signup" className="text-primary font-bold hover:text-primary/80 transition-colors">
+          <Link href={`/auth/signup?callbackUrl=${encodeURIComponent(callbackUrl)}`} className="text-primary font-bold hover:text-primary/80 transition-colors">
             Initialize one here
           </Link>
         </p>

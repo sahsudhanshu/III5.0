@@ -23,27 +23,42 @@ This document summarizes the current state of the platform to facilitate continu
   - `/transactions`: Persistent history of all user actions.
 - **Status**: ✅ Fully functional.
 
+## 🕸️ Smart Knowledge Graph System
+- **Backend**: Python FastAPI server at `backend/stock_network/api.py` (Port 8001).
+- **Core Engine**: Neo4j graph database storing Company, Product, and News nodes.
+- **Analytics**: Real-time calculation of SMA, EMA, RSI, MACD, and Bollinger Bands via `ta`.
+- **Sentiment**: News sentiment analysis using `vaderSentiment`.
+- **Frontend**: Cytoscape-based interactive graph at `/smart-graph`.
+- **Status**: ✅ Component built; Integration in-progress.
+
 ## 🛠️ Execution Context
-- **Website Root**: `d:\III5.0\website` (Next.js)
-- **Agent Root**: `d:\III5.0\trading_agent` (Python)
-- **Environment**: `.env` files in both directories contain API keys for Finnhub, NVIDIA, and MongoDB.
+- **Website Root**: `c:\Users\Sudhanshu\Desktop\Projects\III5.0\website` (Next.js)
+- **Agent Root**: `c:\Users\Sudhanshu\Desktop\Projects\III5.0\trading_agent` (Python - Port 8000)
+- **Graph Root**: `c:\Users\Sudhanshu\Desktop\Projects\III5.0\backend\stock_network` (Python - Port 8001)
+- **Database**: 
+    - MongoDB: Primary user data, auth, and portfolio.
+    - Neo4j: Relationship modeling and technical indicators.
 
 ## 🚀 How to Resume
-1. **Start Python Agent**:
+1. **Start Neo4j (Docker)**:
    ```powershell
-   cd d:\III5.0\trading_agent
-   .\myenv\Scripts\activate
-   python server.py
+   docker start neo4j
    ```
-2. **Start Next.js Frontend**:
+2. **Start Backend API (Graph Engine)**:
    ```powershell
-   cd d:\III5.0\website
+   cd c:\Users\Sudhanshu\Desktop\Projects\III5.0\backend\stock_network
+   # (Ensure venv is active)
+   python api.py
+   ```
+3. **Start Next.js Frontend**:
+   ```powershell
+   cd c:\Users\Sudhanshu\Desktop\Projects\III5.0\website
    npm run dev
    ```
 
 ## ⚠️ Known Issues
-- **Disk Space**: The host system reported `WinError 112` (Disk Full) during some operations. Ensure at least 1-2GB of free space on `C:` for temporary caches.
-- **Finnhub Limits**: Some candle endpoints may fallback to simulation if API limits are reached.
+- **Port Conflict**: Graph API moved to 8001 to avoid clashing with Trading Agent on 8000.
+- **Environment**: Ensure `.env.local` has a secure `AUTH_SECRET` (fixed) for NextAuth compatibility.
 
 ---
-*Created on 2026-04-12*
+*Updated on 2026-04-12*

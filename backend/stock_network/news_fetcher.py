@@ -15,6 +15,14 @@ except ImportError:
     HAS_GNEWS = False
     logger.warning("gnews not installed — run: pip install gnews")
 
+try:
+    from vaderSentiment.vaderSentiment import SentimentIntensityAnalyzer
+    analyzer = SentimentIntensityAnalyzer()
+    HAS_VADER = True
+except ImportError:
+    HAS_VADER = False
+    logger.warning("vaderSentiment not installed.")
+
 
 def fetch_company_news(
     company_name: str,
@@ -32,13 +40,26 @@ def fetch_company_news(
         gn = GNews(language="en", country="US", max_results=max_results)
         results = gn.get_news(query)
         for r in results:
+            snippet = r.get("description", "")[:500] if r.get("description") else ""
+            title = r.get("title", "")
+            
+            sentiment_label = "Neutral"
+            if HAS_VADER:
+                # Combine title and snippet for better context
+                score = analyzer.polarity_scores(f"{title}. {snippet}")['compound']
+                if score >= 0.05:
+                    sentiment_label = "Positive"
+                elif score <= -0.05:
+                    sentiment_label = "Negative"
+            
             items.append({
-                "title": r.get("title", ""),
+                "title": title,
                 "url": r.get("url", ""),
                 "date": r.get("published date", ""),
                 "source": r.get("publisher", {}).get("title", "") if isinstance(r.get("publisher"), dict) else str(r.get("publisher", "")),
-                "snippet": r.get("description", "")[:500] if r.get("description") else "",
+                "snippet": snippet,
                 "search_query": query,
+                "sentiment": sentiment_label,
             })
         logger.info(f"📰 {ticker}: fetched {len(items)} news articles via GNews")
     except Exception as e:
@@ -49,7 +70,7 @@ def fetch_company_news(
 
 def fetch_news_for_tickers(
     company_info_map: Dict[str, dict],
-    max_per_company: int = 3,
+    max_per_company: int = 15,
     delay: float = 1.0,
 ) -> Dict[str, List[dict]]:
     """Fetch news for multiple companies via GNews."""

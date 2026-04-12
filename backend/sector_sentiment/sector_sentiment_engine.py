@@ -23,7 +23,8 @@ class SectorSentimentEngine:
         model_path = Path(model_dir) if model_dir else base_dir / "final_trading_model"
 
         # Load local fine-tuned model
-        self.tokenizer = AutoTokenizer.from_pretrained(model_path)
+        # use_fast=False avoids hard failures when fast tokenizer backend isn't available
+        self.tokenizer = AutoTokenizer.from_pretrained(model_path, use_fast=False)
         self.model = AutoModelForSequenceClassification.from_pretrained(model_path)
         self.model.to(self.device)
         self.model.eval()

@@ -31,17 +31,21 @@ def _download_sector_model_if_needed() -> Optional[Path]:
     base = Path("/data") if Path("/data").exists() else Path("/tmp")
     local_dir = base / "models" / "sector_sentiment" / repo_id.replace("/", "__")
 
+    # If snapshot already exists, use it immediately.
     if local_dir.exists() and any(local_dir.iterdir()):
-        return local_dir
+        nested = local_dir / "final_trading_model"
+        return nested if nested.exists() else local_dir
 
     token = os.getenv("HF_TOKEN") or os.getenv("HUGGINGFACEHUB_API_TOKEN")
     snapshot_download(
         repo_id=repo_id,
         local_dir=str(local_dir),
-        local_dir_use_symlinks=False,
         token=token,
     )
-    return local_dir
+
+    # In our model repo layout, files are under final_trading_model/.
+    nested = local_dir / "final_trading_model"
+    return nested if nested.exists() else local_dir
 
 
 def _download_bundle_if_needed() -> Optional[Path]:

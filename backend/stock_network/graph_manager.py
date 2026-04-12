@@ -28,7 +28,17 @@ SET c.name        = $name,
     c.price_change_pct  = $price_change_pct,
     c.volatility        = $volatility,
     c.beta              = $beta,
-    c.momentum          = $momentum
+    c.momentum          = $momentum,
+    c.sma_50            = $sma_50,
+    c.sma_200           = $sma_200,
+    c.ema_20            = $ema_20,
+    c.rsi               = $rsi,
+    c.macd              = $macd,
+    c.macd_signal       = $macd_signal,
+    c.bb_upper          = $bb_upper,
+    c.bb_lower          = $bb_lower,
+    c.vol_latest        = $vol_latest,
+    c.vol_ma_20         = $vol_ma_20
 """
 
 _CREATE_PRODUCT = """
@@ -49,7 +59,8 @@ SET n.url          = $url,
     n.date         = $date,
     n.source       = $source,
     n.snippet      = $snippet,
-    n.search_query = $search_query
+    n.search_query = $search_query,
+    n.sentiment    = $sentiment
 """
 
 _COMPANY_MENTIONED_IN = """
@@ -67,6 +78,14 @@ SET r.pearson   = $pearson,
     r.abs_avg   = $abs_avg,
     r.strength  = $strength,
     r.direction = $direction
+"""
+
+_RELATED_TO = """
+MATCH (a:Company {ticker: $ticker_a})
+MATCH (b:Company {ticker: $ticker_b})
+MERGE (a)-[r:RELATED_TO]-(b)
+SET r.strength = $strength,
+    r.reason   = $reason
 """
 
 _SAME_SECTOR = """
@@ -110,7 +129,7 @@ def build_full_graph(
     """
     # -- lazy imports so callers don't need everything installed to import this file
     from neo4j_connection import Neo4jConnection
-    from stock_data import fetch_multi_stock_data, get_company_info, get_close_prices
+    from stock_data import fetch_multi_stock_data, get_company_info, get_close_prices, get_volumes
     from news_fetcher import fetch_news_for_tickers
     from stock_analysis import (
         compute_log_returns,
@@ -121,6 +140,9 @@ def build_full_graph(
         compute_momentum,
         compute_current_prices,
         compute_price_change_pct,
+        compute_technical_indicators,
+        compute_volume_metrics,
+        build_trend_similarity_scores
     )
 
     own_conn = conn is None
@@ -138,6 +160,7 @@ def build_full_graph(
         logger.info("📊 Fetching stock data …")
         raw_data = fetch_multi_stock_data(tickers, period=period)
         prices = get_close_prices(raw_data)
+        volumes = get_volumes(raw_data)
 
         # Add SPY as benchamrk for beta (if not already present)
         if "SPY" not in prices.columns:
@@ -158,6 +181,9 @@ def build_full_graph(
         price_changes = compute_price_change_pct(prices)
         corr_pairs = compute_correlation_pairs(returns, min_abs_corr=min_correlation)
         comovement = compute_rolling_comovement(returns)
+        tech_inds = compute_technical_indicators(prices)
+        vol_metrics = compute_volume_metrics(volumes)
+        trend_similarity = build_trend_similarity_scores(tech_inds)
 
         # 3  Fetch company info
         logger.info("🏢 Fetching company metadata …")
@@ -189,6 +215,16 @@ def build_full_graph(
                 "volatility": volatilities.get(t, 0.0),
                 "beta": betas.get(t, 1.0),
                 "momentum": momenta.get(t, 0.0),
+                "sma_50": tech_inds.get(t, {}).get("sma_50", 0.0),
+                "sma_200": tech_inds.get(t, {}).get("sma_200", 0.0),
+                "ema_20": tech_inds.get(t, {}).get("ema_20", 0.0),
+                "rsi": tech_inds.get(t, {}).get("rsi", 50.0),
+                "macd": tech_inds.get(t, {}).get("macd", 0.0),
+                "macd_signal": tech_inds.get(t, {}).get("macd_signal", 0.0),
+                "bb_upper": tech_inds.get(t, {}).get("bb_upper", 0.0),
+                "bb_lower": tech_inds.get(t, {}).get("bb_lower", 0.0),
+                "vol_latest": vol_metrics.get(t, {}).get("vol_latest", 0),
+                "vol_ma_20": vol_metrics.get(t, {}).get("vol_ma_20", 0),
             }
             conn.run_write(_CREATE_COMPANY, params)
 
@@ -245,6 +281,7 @@ def build_full_graph(
                     "source": art.get("source", ""),
                     "snippet": art.get("snippet", ""),
                     "search_query": art.get("search_query", ""),
+                    "sentiment": art.get("sentiment", "Neutral"),
                 })
                 conn.run_write(_COMPANY_MENTIONED_IN, {
                     "ticker": t,
@@ -271,6 +308,16 @@ def build_full_graph(
                 "strength": pair["strength"],
                 "direction": pair["direction"],
             })
+            
+            # If high correlation + similar trend, add RELATED_TO
+            trend_score = trend_similarity.get((a, b), 0.0)
+            if pair["abs_avg"] > 0.4 and trend_score >= 0.6:
+                conn.run_write(_RELATED_TO, {
+                    "ticker_a": a,
+                    "ticker_b": b,
+                    "strength": pair["abs_avg"] + (trend_score * 0.5),
+                    "reason": f"High correlation ({pair['abs_avg']:.2f}) + similar trend ({trend_score:.2f})"
+                })
 
         # 10  SAME_SECTOR edges
         logger.info("🏷️  Creating SAME_SECTOR edges …")

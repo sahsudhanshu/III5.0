@@ -8,6 +8,7 @@ import {
   ArrowUpRight, ArrowDownRight, Search,
   PlusCircle, MinusCircle, Activity,
 } from "lucide-react";
+import { useRequireAuth } from "@/hooks/use-require-auth";
 
 const STATUS_COLORS: Record<string, string> = {
   COMPLETED: "bg-bull-muted text-bull",
@@ -42,10 +43,15 @@ function timeAgo(ts: string) {
 
 export default function TransactionsPage() {
   const { portfolio, fetchPortfolio, loading } = usePortfolioStore();
+  const { isAuthenticated, requireAuth } = useRequireAuth();
   const [search, setSearch] = useState("");
   const [typeFilter, setTypeFilter] = useState<"ALL" | "BUY" | "SELL" | "DEPOSIT" | "WITHDRAW">("ALL");
 
-  useEffect(() => { fetchPortfolio(); }, [fetchPortfolio]);
+  useEffect(() => {
+    if (isAuthenticated) {
+      fetchPortfolio();
+    }
+  }, [fetchPortfolio, isAuthenticated]);
 
   const transactions = [...(portfolio?.transactions ?? [])]
     .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
@@ -69,6 +75,25 @@ export default function TransactionsPage() {
         <div className="h-8 w-40 bg-muted rounded" />
         <div className="grid grid-cols-3 gap-4">
           {[...Array(3)].map((_, i) => <div key={i} className="h-20 bg-muted rounded-xl" />)}
+        </div>
+      </div>
+    );
+  }
+
+  if (!isAuthenticated) {
+    return (
+      <div className="p-6 space-y-6 max-w-[1700px] mx-auto">
+        <div>
+          <h1 className="text-2xl font-bold">Transactions</h1>
+          <p className="text-muted-foreground text-sm">Your complete order & fund history</p>
+        </div>
+        <div className="groww-card p-10 text-center max-w-2xl">
+          <Activity className="w-12 h-12 text-muted-foreground/30 mx-auto mb-4" />
+          <p className="text-lg font-semibold">Personalized Transaction History</p>
+          <p className="text-sm text-muted-foreground mt-2 mb-6">
+            Sign in to view your order history, P&amp;L activity, deposits, and withdrawals.
+          </p>
+          <Button onClick={() => requireAuth(() => {}, "Sign in to view your transaction history")}>Authenticate to Continue</Button>
         </div>
       </div>
     );

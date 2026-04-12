@@ -84,6 +84,18 @@ def get_close_prices(data: Dict[str, pd.DataFrame]) -> pd.DataFrame:
     return prices
 
 
+def get_volumes(data: Dict[str, pd.DataFrame]) -> pd.DataFrame:
+    """Build a single DataFrame of volume (columns = tickers)."""
+    vols: Dict[str, pd.Series] = {}
+    for ticker, df in data.items():
+        if "Volume" in df.columns:
+            s = df["Volume"].copy()
+            if isinstance(s.index, pd.DatetimeIndex):
+                s.index = pd.to_datetime(s.index.date)
+            vols[ticker] = s
+    return pd.DataFrame(vols).fillna(0)
+
+
 # ---------------------------------------------------------------------------
 # Internal helpers
 # ---------------------------------------------------------------------------

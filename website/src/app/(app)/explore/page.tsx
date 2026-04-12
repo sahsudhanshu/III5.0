@@ -16,6 +16,7 @@ import { toast } from "sonner";
 import type { Stock } from "@/types";
 import { useNews } from "@/store/news-store";
 import { useChatContext } from "@/store/chat-store";
+import { useRequireAuth } from "@/hooks/use-require-auth";
 
 // ── Sparkline ──
 // We'll keep dynamic simulated sparklines for dashboards to avoid pulling 5x daily candles APIs 
@@ -79,18 +80,21 @@ function IndexCard({ name, value, change }: { name: string; value: number; chang
 function StockRow({ stock, rank }: { stock: Stock; rank?: number }) {
   const router = useRouter();
   const { isInWatchlist, addToWatchlist, removeFromWatchlist } = useWatchlistStore();
+  const { requireAuth } = useRequireAuth();
   const positive = stock.changePercent >= 0;
   const inWL = isInWatchlist(stock.symbol);
 
   const toggleWL = (e: React.MouseEvent) => {
     e.stopPropagation();
-    if (inWL) {
-      removeFromWatchlist(stock.symbol);
-      toast.success(`${stock.symbol} removed`);
-    } else {
-      addToWatchlist({ symbol: stock.symbol, name: stock.name, exchange: stock.exchange, price: stock.price, change: stock.change, changePercent: stock.changePercent, volume: stock.volume, addedAt: new Date().toISOString() });
-      toast.success(`${stock.symbol} added ⭐`);
-    }
+    requireAuth(() => {
+      if (inWL) {
+        removeFromWatchlist(stock.symbol);
+        toast.success(`${stock.symbol} removed`);
+      } else {
+        addToWatchlist({ symbol: stock.symbol, name: stock.name, exchange: stock.exchange, price: stock.price, change: stock.change, changePercent: stock.changePercent, volume: stock.volume, addedAt: new Date().toISOString() });
+        toast.success(`${stock.symbol} added ⭐`);
+      }
+    }, "Sign in to update your watchlist");
   };
 
   return (

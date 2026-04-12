@@ -1,5 +1,7 @@
 "use client";
 import { useState, useEffect } from "react";
+import Link from "next/link";
+import { usePathname, useRouter } from "next/navigation";
 import { signIn } from "next-auth/react";
 import { Eye, EyeOff, Activity } from "lucide-react";
 import { toast } from "sonner";
@@ -7,7 +9,10 @@ import { useAuthModalStore } from "@/store/auth-modal-store";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 
 export function AuthModal() {
-  const { isOpen, closeModal } = useAuthModalStore();
+  const { isOpen, closeModal, callbackUrl, reason } = useAuthModalStore();
+  const pathname = usePathname();
+  const router = useRouter();
+  const safeCallbackUrl = callbackUrl.startsWith("/") ? callbackUrl : "/dashboard";
   const [isLoading, setIsLoading] = useState(false);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -32,6 +37,7 @@ export function AuthModal() {
         email,
         password,
         redirect: false,
+        callbackUrl: safeCallbackUrl,
       });
 
       if (res?.error) {
@@ -39,6 +45,10 @@ export function AuthModal() {
       } else {
         toast.success("Authentication successful! 🎉");
         closeModal();
+        if (pathname !== safeCallbackUrl) {
+          router.push(safeCallbackUrl);
+        }
+        router.refresh();
       }
     } catch {
       toast.error("Login failed. Please try again.");
@@ -48,9 +58,8 @@ export function AuthModal() {
   };
 
   const handleGoogleLogin = () => {
-    signIn("google", { redirect: false }).then(() => {
-        closeModal();
-    });
+    closeModal();
+    signIn("google", { callbackUrl: safeCallbackUrl });
   };
 
   return (
@@ -73,7 +82,7 @@ export function AuthModal() {
               Action <span className="text-primary">Locked</span>
             </h2>
             <p className="text-white/50 text-xs font-medium tracking-wide text-center">
-              Authenticate to access this feature
+              {reason ?? "Authenticate to access this feature"}
             </p>
           </div>
 
@@ -152,6 +161,17 @@ export function AuthModal() {
             </div>
             Google SSO
           </button>
+
+          <p className="text-center text-[11px] text-white/45 mt-4">
+            Need an account?{" "}
+            <Link
+              href={`/auth/signup?callbackUrl=${encodeURIComponent(safeCallbackUrl)}`}
+              className="text-primary font-semibold hover:text-primary/80 transition-colors"
+              onClick={() => closeModal()}
+            >
+              Create one
+            </Link>
+          </p>
           
           <div className="absolute top-4 right-4 animate-pulse">
             <span className="flex h-2 w-2">

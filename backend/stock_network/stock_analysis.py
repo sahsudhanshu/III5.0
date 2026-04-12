@@ -10,6 +10,7 @@ from typing import Dict, List, Tuple
 import numpy as np
 import pandas as pd
 from scipy.stats import pearsonr, spearmanr
+import ta
 
 logger = logging.getLogger(__name__)
 
@@ -171,3 +172,105 @@ def compute_price_change_pct(prices: pd.DataFrame, days: int = 5) -> Dict[str, f
         else:
             changes[t] = 0.0
     return changes
+
+
+# ---------------------------------------------------------------------------
+# Technical Analysis & Lagging Indicators
+# ---------------------------------------------------------------------------
+
+def compute_technical_indicators(prices: pd.DataFrame) -> Dict[str, dict]:
+    """Calculate SMA, EMA, RSI, MACD, Bollinger Bands for each ticker."""
+    indicators = {}
+    for t in prices.columns:
+        s = prices[t].dropna()
+        # Fallback to zeros if insufficient data
+        default_stats = {
+            "sma_50": 0.0, "sma_200": 0.0, "ema_20": 0.0, "rsi": 50.0,
+            "macd": 0.0, "macd_signal": 0.0, "bb_upper": 0.0, "bb_lower": 0.0
+        }
+        
+        if len(s) < 20: 
+            indicators[t] = default_stats
+            continue
+
+        try:
+            # We use at least available data, MACD/RSI don't strictly require 200 days.
+            # But for sma_200 we might get NaN if len(s) < 200
+            sma_50 = ta.trend.sma_indicator(s, window=min(50, len(s)))
+            sma_200 = ta.trend.sma_indicator(s, window=min(200, len(s))) if len(s)>200 else s
+            ema_20 = ta.trend.ema_indicator(s, window=min(20, len(s)))
+            rsi_series = ta.momentum.rsi(s, window=14)
+            
+            macd_ind = ta.trend.MACD(s)
+            macd_series = macd_ind.macd()
+            macd_signal_series = macd_ind.macd_signal()
+            
+            bb = ta.volatility.BollingerBands(s)
+            bb_upper_series = bb.bollinger_hband()
+            bb_lower_series = bb.bollinger_lband()
+
+            def _get_val(series):
+                v = series.iloc[-1] if not series.empty else 0.0
+                return round(float(v), 2) if not pd.isna(v) else 0.0
+
+            indicators[t] = {
+                "sma_50": _get_val(sma_50),
+                "sma_200": _get_val(sma_200),
+                "ema_20": _get_val(ema_20),
+                "rsi": _get_val(rsi_series) or 50.0,
+                "macd": _get_val(macd_series),
+                "macd_signal": _get_val(macd_signal_series),
+                "bb_upper": _get_val(bb_upper_series),
+                "bb_lower": _get_val(bb_lower_series),
+            }
+        except Exception as e:
+            logger.warning(f"Failed indicator calc for {t}: {e}")
+            indicators[t] = default_stats
+    return indicators
+
+
+def compute_volume_metrics(volumes: pd.DataFrame) -> Dict[str, dict]:
+    """Calculate latest volume and 20-day moving average volume."""
+    metrics = {}
+    for t in volumes.columns:
+        s = volumes[t].dropna()
+        if len(s) < 20:
+             metrics[t] = {"vol_latest": 0, "vol_ma_20": 0}
+             continue
+        metrics[t] = {
+             "vol_latest": int(s.iloc[-1]),
+             "vol_ma_20": int(s.rolling(20).mean().iloc[-1])
+        }
+    return metrics
+
+
+def build_trend_similarity_scores(indicators: Dict[str, dict]) -> Dict[Tuple[str, str], float]:
+    """Create trend similarity based on SMA trend matching and MACD alignment."""
+    tickers = list(indicators.keys())
+    scores = {}
+    for i, a in enumerate(tickers):
+        for b in tickers[i+1:]:
+            ind_a = indicators[a]
+            ind_b = indicators[b]
+            
+            score = 0.0
+            # 1. Price vs SMA50 vs SMA200 trend
+            # if both have 50 > 200 (bullish long term) or both < (bearish)
+            a_bull = (ind_a.get("sma_50", 0) > ind_a.get("sma_200", 0))
+            b_bull = (ind_b.get("sma_50", 0) > ind_b.get("sma_200", 0))
+            if a_bull == b_bull:
+                score += 0.3
+                
+            # 2. MACD
+            a_macd_bull = (ind_a.get("macd", 0) > ind_a.get("macd_signal", 0))
+            b_macd_bull = (ind_b.get("macd", 0) > ind_b.get("macd_signal", 0))
+            if a_macd_bull == b_macd_bull:
+                score += 0.3
+                
+            # 3. RSI Zone
+            if abs(ind_a.get("rsi", 50) - ind_b.get("rsi", 50)) < 15:
+                score += 0.4
+                
+            scores[(a,b)] = round(score, 2)
+            scores[(b,a)] = round(score, 2)
+    return scores

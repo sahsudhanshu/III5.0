@@ -387,6 +387,11 @@ export default function PortfolioPage() {
 
         {!aiInsightLoading && aiInsight && (
           <>
+            {aiInsight.is_fallback && (
+              <p className="text-xs text-amber-500">
+                Using fallback insight: {aiInsight.fallback_reason ?? "AI model unavailable"}
+              </p>
+            )}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
               <div className="rounded-xl border border-border p-3">
                 <p className="text-[11px] text-muted-foreground">Net Worth</p>

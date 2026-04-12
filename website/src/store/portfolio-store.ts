@@ -59,6 +59,8 @@ export interface PortfolioInsightData {
   per_ticker_plan: PortfolioInsightItem[];
   ai_insight_text: string;
   ai_insight_source: "gemini" | "template";
+  is_fallback?: boolean;
+  fallback_reason?: string;
 }
 
 interface PortfolioState {

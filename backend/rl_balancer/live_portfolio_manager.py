@@ -4,7 +4,12 @@ from pathlib import Path
 from typing import Any, Sequence
 
 import numpy as np
+import torch
+import torch.nn.functional as F
+import yfinance as yf
+from gnews import GNews
 from stable_baselines3 import PPO
+from transformers import AutoModelForSequenceClassification, AutoTokenizer
 
 
 class AILivePortfolioManager:
@@ -17,6 +22,14 @@ class AILivePortfolioManager:
         # Load the trained model
         self.model = PPO.load(str(self.model_path))
         self.tickers = ["AAPL", "MSFT", "GOOGL", "AMZN", "TSLA", "META", "NVDA", "BRK-B", "V", "WMT"]
+
+        # Sentiment model for real-time news scoring
+        self.device = "cuda" if torch.cuda.is_available() else "cpu"
+        self.sent_tokenizer = AutoTokenizer.from_pretrained("ProsusAI/finbert")
+        self.sent_model = AutoModelForSequenceClassification.from_pretrained("ProsusAI/finbert")
+        self.sent_model.to(self.device)
+        self.sent_model.eval()
+        self.gnews_client = GNews(language="en", country="US", period="24h", max_results=10)
         print("✅ Agent ready for live market execution.")
 
     @staticmethod
@@ -54,6 +67,84 @@ class AILivePortfolioManager:
             raise ValueError(f"current_sentiments must have {expected} values")
         if any(float(p) <= 0 for p in current_prices):
             raise ValueError("All prices must be > 0")
+
+    def _score_headlines(self, headlines: Sequence[str]) -> float:
+        if not headlines:
+            return 0.0
+        inputs = self.sent_tokenizer(
+            list(headlines),
+            padding=True,
+            truncation=True,
+            return_tensors="pt",
+            max_length=128,
+        )
+        inputs = {k: v.to(self.device) for k, v in inputs.items()}
+        with torch.no_grad():
+            probs = F.softmax(self.sent_model(**inputs).logits, dim=-1)
+        # FinBERT order: [negative, neutral, positive]
+        per_headline = (probs[:, 2] - probs[:, 0]).detach().cpu().numpy()
+        return float(np.mean(per_headline))
+
+    def fetch_live_prices(self) -> list[float]:
+        prices: list[float] = []
+        for ticker in self.tickers:
+            stock = yf.Ticker(ticker)
+            hist = stock.history(period="2d", interval="1d")
+            price: float | None = None
+            if hist is not None and not hist.empty:
+                last_close = float(hist["Close"].dropna().iloc[-1])
+                if np.isfinite(last_close) and last_close > 0:
+                    price = last_close
+            if price is None:
+                info = stock.fast_info or {}
+                candidate = info.get("last_price")
+                if candidate is not None and np.isfinite(candidate) and float(candidate) > 0:
+                    price = float(candidate)
+            if price is None:
+                raise RuntimeError(f"Could not fetch live price for {ticker}")
+            prices.append(round(price, 4))
+        return prices
+
+    def fetch_live_sentiments(self, source: str = "gnews", headlines_per_ticker: int = 5) -> list[float]:
+        sentiments: list[float] = []
+        for ticker in self.tickers:
+            headlines: list[str] = []
+            if source == "yfinance":
+                items = (yf.Ticker(ticker).news or [])[:headlines_per_ticker]
+                headlines = [str(i.get("title", "")).strip() for i in items if i.get("title")]
+            else:
+                items = self.gnews_client.get_news(f"{ticker} stock") or []
+                headlines = [
+                    str(i.get("title", "")).strip()
+                    for i in items[:headlines_per_ticker]
+                    if i.get("title")
+                ]
+
+            sentiments.append(round(self._score_headlines(headlines), 4) if headlines else 0.0)
+        return sentiments
+
+    def calculate_trades_from_live_data(
+        self,
+        current_cash: float,
+        current_quantities: Sequence[float],
+        sentiment_source: str = "gnews",
+        headlines_per_ticker: int = 5,
+    ) -> tuple[dict[str, dict[str, Any]], float, list[float], list[float]]:
+        if len(current_quantities) != len(self.tickers):
+            raise ValueError(f"current_quantities must have {len(self.tickers)} values")
+
+        current_prices = self.fetch_live_prices()
+        current_sentiments = self.fetch_live_sentiments(
+            source=sentiment_source,
+            headlines_per_ticker=headlines_per_ticker,
+        )
+        trade_plan, net_worth = self.calculate_trades(
+            current_cash,
+            current_prices,
+            current_quantities,
+            current_sentiments,
+        )
+        return trade_plan, net_worth, current_prices, current_sentiments
 
     def calculate_trades(
         self,

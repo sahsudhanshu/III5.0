@@ -6,21 +6,21 @@ from live_portfolio_manager import AILivePortfolioManager
 def main() -> int:
     agent = AILivePortfolioManager()
 
-    # Mock live data
+    # Current holdings state (prices + sentiments are fetched live)
     live_cash = 15000.00
-    live_prices = [170.5, 410.2, 140.0, 180.5, 175.0, 500.0, 880.0, 400.0, 275.0, 60.0]
     live_quantities = [10, 5, 20, 0, 5, 2, 1, 0, 0, 50]
-    live_sentiments = [0.1, 0.2, 0.0, 0.5, -0.9, 0.1, 0.85, 0.0, 0.1, -0.2]
 
-    print("\n📡 Analyzing Live Market Data...")
-    orders, total_worth = agent.calculate_trades(
+    print("\n📡 Analyzing Live Market Data (prices + news sentiment)...")
+    orders, total_worth, live_prices, live_sentiments = agent.calculate_trades_from_live_data(
         live_cash,
-        live_prices,
         live_quantities,
-        live_sentiments,
+        sentiment_source="gnews",
+        headlines_per_ticker=5,
     )
 
     print(f"\n💼 TOTAL PORTFOLIO NET WORTH: ${total_worth:,.2f}")
+    print("LIVE PRICES:", live_prices)
+    print("LIVE SENTIMENTS:", live_sentiments)
     print("=" * 72)
     print(f"{'TICKER':<8} | {'ACTION':<6} | {'SHARES TO TRADE':<16} | {'NEW TARGET %'}")
     print("-" * 72)

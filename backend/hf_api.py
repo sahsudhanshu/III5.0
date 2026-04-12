@@ -90,6 +90,15 @@ class SectorRequest(BaseModel):
     sector: str = Field(..., examples=["Semiconductors", "Energy"])
 
 
+class SectorHeadlinesRequest(BaseModel):
+    headlines: list[str] = Field(
+        ...,
+        min_length=50,
+        max_length=50,
+        description="Exactly 50 externally-fetched news headlines",
+    )
+
+
 class ForecastRequest(BaseModel):
     ticker: str = Field(..., examples=["AAPL", "NVDA"])
     days: int = Field(7, ge=1, le=30)
@@ -111,6 +120,43 @@ def sector_sentiment(req: SectorRequest):
     if not result:
         raise HTTPException(status_code=404, detail="No news found for sector")
     return result
+
+
+@app.post("/sector-sentiment-headlines")
+def sector_sentiment_headlines(req: SectorHeadlinesRequest):
+    # News fetching is expected outside this API. We only score provided headlines.
+    cleaned = [h.strip() for h in req.headlines if h and h.strip()]
+    if len(cleaned) != 50:
+        raise HTTPException(status_code=400, detail="headlines must contain exactly 50 non-empty strings")
+
+    engine = get_sector_engine()
+    result = engine.analyze_headlines(cleaned, sector_query="HEADLINES")
+    if not result:
+        raise HTTPException(status_code=400, detail="No valid headlines provided")
+
+    positive = int(result["positive"])
+    negative = int(result["negative"])
+    neutral = int(result["neutral"])
+    if positive > negative and positive > neutral:
+        overall = "POSITIVE"
+    elif negative > positive and negative > neutral:
+        overall = "NEGATIVE"
+    else:
+        overall = "NEUTRAL"
+
+    return {
+        "total_headlines": result["total_headlines"],
+        "positive": result["positive"],
+        "negative": result["negative"],
+        "neutral": result["neutral"],
+        "positive_pct": result["positive_pct"],
+        "negative_pct": result["negative_pct"],
+        "neutral_pct": result["neutral_pct"],
+        "overall_sentiment": overall,
+        "sentiment_score": result["sentiment_score"],
+        "signal": result["signal"],
+        "timestamp": result["timestamp"],
+    }
 
 
 @app.post("/stock-forecast")

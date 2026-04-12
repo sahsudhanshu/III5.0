@@ -37,24 +37,21 @@ class SectorSentimentEngine:
         self.id2label = {0: "POSITIVE", 1: "NEGATIVE", 2: "NEUTRAL"}
         print(f"✅ Model loaded on {self.device.upper()}. Target: Sector Consensus.")
 
-    def run_analysis(self, sector_query):
-        print(f"\n🔍 Fetching latest news for sector: '{sector_query}'...")
-        news = self.news_client.get_news(f"{sector_query} stock market")
-        
-        if not news:
-            print("⚠️  No news found for this sector.")
+    def analyze_headlines(self, headlines, sector_query: str = "CUSTOM"):
+        """
+        Analyze externally-fetched headlines.
+        Expect caller to provide the news list (API should not fetch news inside).
+        """
+        if not headlines:
             return None
 
-        headlines = [item['title'] for item in news]
-        
-        print(f"📰 Found {len(headlines)} headlines. Running batch inference...")
-        
-        # --- Batch Inference ---
+        print(f"📰 Received {len(headlines)} headlines. Running batch inference...")
+
         inputs = self.tokenizer(
-            headlines, 
-            padding=True, 
-            truncation=True, 
-            return_tensors="pt", 
+            headlines,
+            padding=True,
+            truncation=True,
+            return_tensors="pt",
             max_length=128
         )
         inputs = {k: v.to(self.device) for k, v in inputs.items()}
@@ -64,16 +61,11 @@ class SectorSentimentEngine:
             probs = F.softmax(outputs.logits, dim=-1)
             preds = torch.argmax(probs, dim=-1).tolist()
 
-        # --- Aggregation Logic ---
         pos = preds.count(0)
         neg = preds.count(1)
         neu = preds.count(2)
-        
-        # Calculate Net Sentiment Score (-1.0 to 1.0)
-        # We add 1e-5 to avoid division by zero
         score = (pos - neg) / (pos + neg + 1e-5)
 
-        # Recommendation Engine
         if score > 0.2:
             signal = "STRONG BUY / BULLISH 🚀"
             confidence = "HIGH"
@@ -90,10 +82,47 @@ class SectorSentimentEngine:
             signal = "HOLD / NEUTRAL ⚖️"
             confidence = "NEUTRAL"
 
-        # Calculate percentages
-        pos_pct = (pos / len(headlines)) * 100
-        neg_pct = (neg / len(headlines)) * 100
-        neu_pct = (neu / len(headlines)) * 100
+        total = len(headlines)
+        pos_pct = (pos / total) * 100
+        neg_pct = (neg / total) * 100
+        neu_pct = (neu / total) * 100
+
+        return {
+            "sector": sector_query,
+            "total_headlines": total,
+            "positive": pos,
+            "negative": neg,
+            "neutral": neu,
+            "positive_pct": pos_pct,
+            "negative_pct": neg_pct,
+            "neutral_pct": neu_pct,
+            "sentiment_score": score,
+            "signal": signal,
+            "confidence": confidence,
+            "timestamp": datetime.now().isoformat()
+        }
+
+    def run_analysis(self, sector_query):
+        print(f"\n🔍 Fetching latest news for sector: '{sector_query}'...")
+        news = self.news_client.get_news(f"{sector_query} stock market")
+        
+        if not news:
+            print("⚠️  No news found for this sector.")
+            return None
+
+        headlines = [item['title'] for item in news]
+        result = self.analyze_headlines(headlines, sector_query=sector_query)
+        if not result:
+            return None
+        pos = result["positive"]
+        neg = result["negative"]
+        neu = result["neutral"]
+        pos_pct = result["positive_pct"]
+        neg_pct = result["negative_pct"]
+        neu_pct = result["neutral_pct"]
+        score = result["sentiment_score"]
+        signal = result["signal"]
+        confidence = result["confidence"]
 
         # --- Result Display ---
         print("\n" + "=" * 60)
@@ -115,25 +144,10 @@ class SectorSentimentEngine:
         # Show top 3 headlines for context
         print("\n📰 TOP HEADLINES:")
         for i, headline in enumerate(headlines[:3], 1):
-            label = self.id2label[preds[i-1]]
-            print(f"{i}. [{label}] {headline[:70]}...")
+            print(f"{i}. {headline[:70]}...")
 
         print("=" * 60 + "\n")
-        
-        return {
-            "sector": sector_query,
-            "total_headlines": len(headlines),
-            "positive": pos,
-            "negative": neg,
-            "neutral": neu,
-            "positive_pct": pos_pct,
-            "negative_pct": neg_pct,
-            "neutral_pct": neu_pct,
-            "sentiment_score": score,
-            "signal": signal,
-            "confidence": confidence,
-            "timestamp": datetime.now().isoformat()
-        }
+        return result
 
 
 def main():

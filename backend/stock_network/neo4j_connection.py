@@ -18,15 +18,17 @@ if "localhost" not in _no_proxy:
 NEO4J_URI = os.environ.get("NEO4J_URI", "bolt://localhost:7687")
 NEO4J_USER = os.environ.get("NEO4J_USER", "neo4j")
 NEO4J_PASSWORD = os.environ.get("NEO4J_PASSWORD", "stocknetwork123")
+NEO4J_DATABASE = os.environ.get("NEO4J_DATABASE", "neo4j")
 
 
 class Neo4jConnection:
     """Manages Neo4j driver lifecycle."""
 
-    def __init__(self, uri: str = None, user: str = None, password: str = None):
+    def __init__(self, uri: str = None, user: str = None, password: str = None, database: str = None):
         self._uri = uri or NEO4J_URI
         self._user = user or NEO4J_USER
         self._password = password or NEO4J_PASSWORD
+        self._database = database or NEO4J_DATABASE
         self._driver = None
 
     # Context manager --------------------------------------------------------
@@ -62,13 +64,13 @@ class Neo4jConnection:
     # Query helpers ----------------------------------------------------------
     def run_query(self, query: str, parameters: dict = None):
         """Run a Cypher query and return list of record dicts."""
-        with self.driver.session() as session:
+        with self.driver.session(database=self._database) as session:
             result = session.run(query, parameters or {})
             return [record.data() for record in result]
 
     def run_write(self, query: str, parameters: dict = None):
         """Run a write transaction."""
-        with self.driver.session() as session:
+        with self.driver.session(database=self._database) as session:
             return session.execute_write(
                 lambda tx: tx.run(query, parameters or {}).consume()
             )

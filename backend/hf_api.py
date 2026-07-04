@@ -14,6 +14,7 @@ from .sector_sentiment import SectorSentimentEngine
 from .stock_price_prediction import StockAppEngine
 
 import sys
+from pathlib import Path
 _sn_path = str(Path(__file__).parent / "stock_network")
 if _sn_path not in sys.path:
     sys.path.insert(0, _sn_path)

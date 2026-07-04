@@ -12,6 +12,8 @@ from huggingface_hub import hf_hub_download, snapshot_download
 from .rl_balancer import AILivePortfolioManager
 from .sector_sentiment import SectorSentimentEngine
 from .stock_price_prediction import StockAppEngine
+from .stock_network.graph_manager import build_full_graph
+from .stock_network.graph_chat import chat_with_graph
 
 
 app = FastAPI(title="III5 Backend (Sentiment + Forecast)", version="1.0.0")
@@ -97,6 +99,16 @@ def get_rl_engine() -> AILivePortfolioManager:
 
 class SectorRequest(BaseModel):
     sector: str = Field(..., examples=["Semiconductors", "Energy"])
+
+
+class BuildGraphRequest(BaseModel):
+    tickers: list[str] = Field(..., examples=[["AAPL", "MSFT"]])
+
+
+class GraphChatRequest(BaseModel):
+    query: str
+    history: Optional[list[dict]] = None
+    selected_ticker: Optional[str] = None
 
 
 class SectorHeadlinesRequest(BaseModel):
@@ -355,3 +367,30 @@ def portfolio_ai_insight(req: PortfolioInsightRequest):
         "ai_insight_text": insight_text,
         "ai_insight_source": insight_source,
     }
+
+
+@app.post("/build-graph")
+def build_graph(req: BuildGraphRequest):
+    if not req.tickers:
+        raise HTTPException(status_code=400, detail="Must provide at least one ticker.")
+    try:
+        clean_tickers = [t.strip().upper() for t in req.tickers if t.strip()]
+        stats = build_full_graph(tickers=clean_tickers, period="6mo")
+        return {"status": "success", "stats": stats}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/graph-chat")
+async def graph_chat(req: GraphChatRequest):
+    if not req.query.strip():
+        raise HTTPException(status_code=400, detail="Query cannot be empty.")
+    try:
+        result = await chat_with_graph(
+            user_query=req.query,
+            history=req.history,
+            selected_ticker=req.selected_ticker,
+        )
+        return result
+    except Exception as e:
+        return {"response": f"⚠️ Error: {str(e)}", "tickers": [], "related": [], "edges": []}

@@ -375,7 +375,7 @@ def portfolio_ai_insight(req: PortfolioInsightRequest):
     }
 
 
-@app.post("/build-graph")
+@app.post("/api/build-graph")
 def build_graph(req: BuildGraphRequest):
     if not req.tickers:
         raise HTTPException(status_code=400, detail="Must provide at least one ticker.")
@@ -387,7 +387,7 @@ def build_graph(req: BuildGraphRequest):
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@app.post("/graph-chat")
+@app.post("/api/graph-chat")
 async def graph_chat(req: GraphChatRequest):
     if not req.query.strip():
         raise HTTPException(status_code=400, detail="Query cannot be empty.")

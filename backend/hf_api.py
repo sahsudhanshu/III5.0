@@ -12,6 +12,12 @@ from huggingface_hub import hf_hub_download, snapshot_download
 from .rl_balancer import AILivePortfolioManager
 from .sector_sentiment import SectorSentimentEngine
 from .stock_price_prediction import StockAppEngine
+
+import sys
+_sn_path = str(Path(__file__).parent / "stock_network")
+if _sn_path not in sys.path:
+    sys.path.insert(0, _sn_path)
+
 from .stock_network.graph_manager import build_full_graph
 from .stock_network.graph_chat import chat_with_graph
 

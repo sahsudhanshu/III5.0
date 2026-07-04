@@ -53,7 +53,8 @@ export const useChatStore = create<ChatState>()((set, get) => ({
 
     // Connect to actual local FastAPI LangGraph agent
     try {
-      const response = await fetch("http://127.0.0.1:8000/api/chat", {
+      const baseUrl = process.env.NEXT_PUBLIC_TRADING_AGENT_BASE_URL || "http://127.0.0.1:8000";
+      const response = await fetch(`${baseUrl}/api/chat`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ message: content, context: get().context }),

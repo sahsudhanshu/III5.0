@@ -115,7 +115,8 @@ export function TradingChart({
       setPopover({ visible: true, x, y, loading: true, result: null, error: null });
 
       try {
-        const res = await fetch("http://127.0.0.1:8000/api/analyze-point", {
+        const baseUrl = process.env.NEXT_PUBLIC_TRADING_AGENT_BASE_URL || "http://127.0.0.1:8000";
+        const res = await fetch(`${baseUrl}/api/analyze-point`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ symbol, timeframe, date }),

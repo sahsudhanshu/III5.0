@@ -7,7 +7,8 @@ export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
 
-    const res = await fetch('http://localhost:8001/api/graph-chat', {
+    const baseUrl = process.env.NEXT_PUBLIC_HF_BACKEND_BASE_URL || 'http://localhost:8001';
+    const res = await fetch(`${baseUrl}/api/graph-chat`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(body),

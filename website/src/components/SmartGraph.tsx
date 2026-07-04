@@ -222,7 +222,8 @@ export default function SmartGraph() {
     setError(null);
 
     try {
-      const res = await fetch('http://localhost:8001/api/build-graph', {
+      const baseUrl = process.env.NEXT_PUBLIC_HF_BACKEND_BASE_URL || 'http://localhost:8001';
+      const res = await fetch(`${baseUrl}/api/build-graph`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ tickers: tickersArray }),
